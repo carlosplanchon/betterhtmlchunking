@@ -17,6 +17,7 @@ from enum import StrEnum
 
 from typing import Iterator
 from typing import Any
+from typing import Optional
 
 # import prettyprinter
 
@@ -249,6 +250,10 @@ class TreeRegionsSystem:
     max_node_repr_length: int = attrs.field(
         validator=type_validator()
     )
+    root_xpath: Optional[str] = attrs.field(
+        validator=type_validator(),
+        default=None
+    )
     regions_of_interest_list: list[RegionOfInterest] = attrs.field(
         validator=type_validator(),
         init=False
@@ -289,7 +294,17 @@ class TreeRegionsSystem:
 
         subtrees_queue = queue.Queue()
 
-        subtrees_queue.put("/html")
+        if self.root_xpath is not None:
+            root_xpath = self.root_xpath
+        elif "/html" in self.tree_representation.pos_xpaths_list:
+            root_xpath = "/html"
+        elif self.tree_representation.pos_xpaths_list:
+            root_xpath = self.tree_representation.pos_xpaths_list[0]
+        else:
+            self.sorted_roi_by_pos_xpath = {}
+            return
+
+        subtrees_queue.put(root_xpath)
 
         while subtrees_queue.empty() is False:
             # print("#" * 100)
