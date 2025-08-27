@@ -115,6 +115,14 @@ class ROIMaker:
         while self.PARSING_STATE != ROIParsingState.EOF:
             self.step()
 
+        # If no region was finalized but some nodes were gathered, ensure
+        # this collected region is not lost.
+        if (
+            len(self.regions_of_interest_list) == 0
+            and self.actual_region_of_interest.pos_xpath_list != []
+        ):
+            self.regions_of_interest_list.append(self.actual_region_of_interest)
+
         node_is_roi: bool = False
         if len(self.children_tags) == 0:
             node_is_roi = True
