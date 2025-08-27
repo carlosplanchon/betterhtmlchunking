@@ -24,3 +24,11 @@ def test_remove_unwanted_tags_prunes_tree():
     tree.recompute_representation()
     assert "/html/body/p" in tree.pos_xpaths_list
     assert all("/script" not in xp and "/style" not in xp for xp in tree.pos_xpaths_list)
+
+
+def test_wanted_xpath_does_not_match_partial_names():
+    assert wanted_xpath("/html/body/header", ["/head"]) is True
+
+
+def test_wanted_xpath_handles_indexed_nodes():
+    assert wanted_xpath("/html/body/script[1]", ["/script"]) is False
