@@ -5,6 +5,7 @@ import attrs
 from attrs_strict import type_validator
 
 import queue
+import warnings
 
 import treelib
 
@@ -124,8 +125,22 @@ class ROIMaker:
             self.regions_of_interest_list.append(self.actual_region_of_interest)
 
         node_is_roi: bool = False
+        node_repr_length: Optional[int] = None
         if len(self.children_tags) == 0:
             node_is_roi = True
+            node = self.tree_representation.tree.get_node(
+                nid=self.node_xpath
+            )
+            node_repr_length = self.get_node_repr_length(node=node)
+            if node_repr_length > self.max_node_repr_length:
+                warnings.warn(
+                    (
+                        f"Leaf node '{self.node_xpath}' has length "
+                        f"{node_repr_length} which exceeds the maximum "
+                        f"allowed ({self.max_node_repr_length}). "
+                        "Consider splitting the text or increasing the limit."
+                    )
+                )
         elif len(self.regions_of_interest_list) == 1:
             roi = self.regions_of_interest_list[0]
             if len(roi.pos_xpath_list) == len(self.children_tags):
@@ -134,13 +149,11 @@ class ROIMaker:
         # Node itself is ROI.
         if node_is_roi is True:
             # print(f"> Node itself is ROI: {self.node_xpath}")
-            node: treelib.Node =\
-                self.tree_representation.tree.get_node(
+            if node_repr_length is None:
+                node: treelib.Node = self.tree_representation.tree.get_node(
                     nid=self.node_xpath
                 )
-
-            node_repr_length: int =\
-                self.get_node_repr_length(node=node)
+                node_repr_length = self.get_node_repr_length(node=node)
 
             # prettyprinter.cpprint(node_repr_length)
 
