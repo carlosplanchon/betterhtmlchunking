@@ -1,47 +1,64 @@
+[build-system]
+requires = ["setuptools>=77.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [tool.uv]
 package = true
-
-[options]
-package_dir = "betterhtmlchunking"
-packages = ["betterhtmlchunking"]
 
 [project]
 name = "betterhtmlchunking"
 version = "0.9.4"
-authors = [
-    { name = "Carlos A. Planchón", email = "carlosandresplanchonprestes@gmail.com" }
-]
-requires-python = ">=3.12"
 description = "A Python library for intelligent HTML segmentation and ROI extraction. It builds a DOM tree from raw HTML and extracts content-rich regions for efficient web scraping and analysis."
-classifiers = [
-    "Intended Audience :: Developers",
-    "Topic :: Software Development :: Libraries",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.12"
-]
-license = { text = "MIT License" }
-keywords = ["html", "chunking", "scraping", "dom", "roi", "content extraction", "web-scraping"]
 readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+  { name = "Carlos A. Planchón", email = "carlosandresplanchonprestes@gmail.com" }
+]
+
+# SPDX (formato nuevo)
+license = "MIT"
+license-files = ["LICENSE"]
+
+keywords = ["html", "chunking", "scraping", "dom", "roi", "content extraction", "web-scraping"]
+
 dependencies = [
-    "attrs",
-    "attrs-strict",
-    "beautifulsoup4",
-    "lxml",
-    "treelib",
-    "parsel_text",
-    "typer",
-    "pytest>=9.0.2",
-    "pytest-cov>=7.0.0",
+  "attrs",
+  "attrs-strict",
+  "beautifulsoup4",
+  "lxml",
+  "treelib",
+  "parsel_text",
+  "typer",
+]
+
+classifiers = [
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Libraries",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9.0.2",
+  "pytest-cov>=7.0.0",
+  "ipython>=9.9.0",
+  "prettyprinter>=0.18.0",
 ]
 
 [project.scripts]
 betterhtmlchunking = "betterhtmlchunking.cli:app"
 
 [project.urls]
-repository = "https://github.com/carlosplanchon/betterhtmlchunking.git"
+Repository = "https://github.com/carlosplanchon/betterhtmlchunking"
+Issues = "https://github.com/carlosplanchon/betterhtmlchunking/issues"
 
-[dependency-groups]
-dev = [
-    "ipython>=9.9.0",
-    "prettyprinter>=0.18.0",
-]
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["betterhtmlchunking*"]
+exclude = ["tests*"]
