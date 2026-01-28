@@ -15,8 +15,6 @@ from betterhtmlchunking.tree_representation import\
 
 from enum import StrEnum
 
-from typing import Iterator
-from typing import Any
 from typing import Optional
 
 # import prettyprinter
@@ -27,12 +25,6 @@ from typing import Optional
 #   --- TreeRegionsSystem ---   #
 #                               #
 #################################
-
-class ROIParsingState(StrEnum):
-    SEEK_END: str = "seek_end"
-    REGION_READY: str = "region_ready"
-    EOF: str = "EOF"
-
 
 @attrs.define()
 class RegionOfInterest:
@@ -78,18 +70,6 @@ class ROIMaker:
         validator=type_validator(),
     )
 
-    PARSING_STATE: ROIParsingState = attrs.field(
-        validator=type_validator(),
-        default=ROIParsingState.SEEK_END
-    )
-    children_tags_iter: Iterator[str] = attrs.field(
-        validator=type_validator(),
-        init=False
-    )
-    actual_region_of_interest: Any = attrs.field(
-        validator=type_validator(),
-        init=False
-    )
     regions_of_interest_list: list[RegionOfInterest] = attrs.field(
         validator=type_validator(),
         init=False
@@ -100,124 +80,91 @@ class ROIMaker:
     )
 
     def __attrs_post_init__(self) -> None:
-        # print(f"> ROIMaker: Node XPATH: {self.node_xpath}")
-
         self.regions_of_interest_list: list[RegionOfInterest] = []
         self.children_to_enqueue: list[str] = []
-        self.actual_region_of_interest = RegionOfInterest()
 
-        # Explore for ROIs on children.
-        self.children_tags_iter = iter(self.children_tags)
+        # Process children and group them into regions
+        self._process_children()
 
-        self.actual_region_of_interest.node_is_roi = False
+        # Check if the node itself should be an ROI
+        self._check_node_as_roi()
 
-        self.step()
-        while self.PARSING_STATE != ROIParsingState.EOF:
-            self.step()
+    def get_node_repr_length(self, node: treelib.Node) -> int:
+        """Get the representation length of a node based on comparison mode."""
+        match self.repr_length_compared_by:
+            case ReprLengthComparisionBy.TEXT_LENGTH:
+                return node.data.text_length
+            case ReprLengthComparisionBy.HTML_LENGTH:
+                return node.data.html_length
 
-        node_is_roi: bool = False
-        if len(self.children_tags) == 0:
+    def _process_children(self) -> None:
+        """Group children into regions that don't exceed max_node_repr_length."""
+        if not self.children_tags:
+            return
+
+        current_region = RegionOfInterest()
+
+        for child_xpath in self.children_tags:
+            node = self.tree_representation.tree.get_node(nid=child_xpath)
+            node_length = self.get_node_repr_length(node=node)
+
+            # If node itself is too large, needs separate processing
+            if node_length >= self.max_node_repr_length:
+                # Close current region if it has content
+                if current_region.pos_xpath_list:
+                    self.regions_of_interest_list.append(current_region)
+                    current_region = RegionOfInterest()
+                # Mark child for deeper processing
+                self.children_to_enqueue.append(child_xpath)
+                continue
+
+            # Check if adding this node would exceed the limit
+            proposed_length = current_region.repr_length + node_length
+
+            if proposed_length >= self.max_node_repr_length:
+                # Close current region
+                if current_region.pos_xpath_list:
+                    self.regions_of_interest_list.append(current_region)
+                    current_region = RegionOfInterest()
+
+            # Add node to current region
+            current_region.pos_xpath_list.append(child_xpath)
+            current_region.repr_length += node_length
+
+        # Handle remaining content in current region
+        if current_region.pos_xpath_list:
+            if self.regions_of_interest_list:
+                # Merge with last region
+                self.regions_of_interest_list[-1].pos_xpath_list += current_region.pos_xpath_list
+                self.regions_of_interest_list[-1].repr_length += current_region.repr_length
+            else:
+                # First and only region
+                self.regions_of_interest_list.append(current_region)
+
+    def _check_node_as_roi(self) -> None:
+        """Check if the node itself should be treated as a single ROI."""
+        node_is_roi = False
+
+        # Node is ROI if it has no children
+        if not self.children_tags:
             node_is_roi = True
+        # Node is ROI if all children fit in a single region
         elif len(self.regions_of_interest_list) == 1:
             roi = self.regions_of_interest_list[0]
             if len(roi.pos_xpath_list) == len(self.children_tags):
                 node_is_roi = True
 
-        # Node itself is ROI.
-        if node_is_roi is True:
-            # print(f"> Node itself is ROI: {self.node_xpath}")
-            node: treelib.Node =\
-                self.tree_representation.tree.get_node(
-                    nid=self.node_xpath
-                )
+        if node_is_roi:
+            node = self.tree_representation.tree.get_node(nid=self.node_xpath)
+            node_repr_length = self.get_node_repr_length(node=node)
 
-            node_repr_length: int =\
-                self.get_node_repr_length(node=node)
+            # Create a single ROI for the entire node
+            single_roi = RegionOfInterest()
+            single_roi.repr_length = node_repr_length
+            single_roi.pos_xpath_list.append(self.node_xpath)
+            single_roi.node_is_roi = True
 
-            # prettyprinter.cpprint(node_repr_length)
-
-            # if node_repr_length > self.max_node_repr_length:
-            self.actual_region_of_interest.repr_length =\
-                node_repr_length
-            self.actual_region_of_interest.pos_xpath_list.append(
-                self.node_xpath
-            )
-            self.actual_region_of_interest.node_is_roi = True
-
-            self.regions_of_interest_list = []
-
-            self.regions_of_interest_list.append(
-                self.actual_region_of_interest
-            )
-
-        return None
-
-    def get_node_repr_length(self, node: treelib.Node) -> int:
-        match self.repr_length_compared_by:
-            case ReprLengthComparisionBy.TEXT_LENGTH:
-                node_repr_length: int = node.data.text_length
-            case ReprLengthComparisionBy.HTML_LENGTH:
-                node_repr_length: int = node.data.html_length
-
-        return node_repr_length
-
-    # Based on XMLStreamer.
-    def step(self):
-        match self.PARSING_STATE:
-            case ROIParsingState.SEEK_END:
-                # print("> SEEK END:")
-                try:
-                    children_tag: str = next(self.children_tags_iter)
-                    # print(f"children_tag: {children_tag}")
-                    node: treelib.Node =\
-                        self.tree_representation.tree.get_node(
-                            nid=children_tag
-                        )
-
-                    node_repr_length: int = self.get_node_repr_length(
-                        node=node
-                    )
-                    # print(f"node_repr_length: {node_repr_length}")
-
-                    if node_repr_length >= self.max_node_repr_length:
-                        self.PARSING_STATE = ROIParsingState.REGION_READY
-                        self.children_to_enqueue.append(children_tag)
-                    else:
-                        proposed_repr_length: int = node_repr_length +\
-                            self.actual_region_of_interest.repr_length
-
-                        # print(f"proposed_repr_length: {proposed_repr_length}")
-
-                        self.actual_region_of_interest.pos_xpath_list.append(
-                            node.identifier
-                        )
-                        self.actual_region_of_interest.repr_length =\
-                            proposed_repr_length
-
-                        if proposed_repr_length >= self.max_node_repr_length:
-                            self.PARSING_STATE = ROIParsingState.REGION_READY
-
-                except StopIteration:
-                    self.PARSING_STATE = ROIParsingState.EOF
-                    # print("StopIteration.")
-                    # prettyprinter.cpprint(self.actual_region_of_interest)
-                    if self.actual_region_of_interest.repr_length > 0 and\
-                            len(self.regions_of_interest_list) > 0:
-                        # print("Hanging xpaths.")
-                        self.regions_of_interest_list[-1].repr_length +=\
-                            self.actual_region_of_interest.repr_length
-                        self.regions_of_interest_list[-1].pos_xpath_list +=\
-                            self.actual_region_of_interest.pos_xpath_list
-                        self.actual_region_of_interest = RegionOfInterest()
-
-            case ROIParsingState.REGION_READY:
-                # print("> REGION READY:")
-                self.regions_of_interest_list.append(
-                    self.actual_region_of_interest
-                )
-
-                self.PARSING_STATE = ROIParsingState.SEEK_END
-                self.actual_region_of_interest = RegionOfInterest()
+            self.regions_of_interest_list = [single_roi]
 
 
 def order_regions_of_interest_by_pos_xpath(
