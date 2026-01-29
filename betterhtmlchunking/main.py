@@ -13,16 +13,10 @@ from betterhtmlchunking.tree_regions_system import (
     ReprLengthComparisionBy,
 )
 from betterhtmlchunking.render_system import RenderSystem
+from betterhtmlchunking.logging_config import get_logger
 
 # Module-level logger
-logger = logging.getLogger(__name__)
-logger.propagate = False  # Prevent double logging
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter("%(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)  # default; CLI can override
+logger = get_logger("main")
 
 tag_list_to_filter_out: list[str] = [
     "/head",
@@ -108,46 +102,47 @@ class DomRepresentation:
         Parameters
         ----------
         verbose:
-            Logs high-level pipeline steps.
+            Logs high-level pipeline steps (INFO level).
         maximal_verbose:
-            Logs detailed DOM, node info, ROIs, and chunk info.
+            Logs detailed DOM, node info, ROIs, and chunk info (DEBUG level).
         """
-        if verbose or maximal_verbose:
-            logger.info("--- DOM REPRESENTATION ---")
-            logger.info(" > Computing tree representation:")
+        logger.info("Starting DOM representation processing")
+        logger.info("Step 1/3: Computing tree representation")
         self.compute_tree_representation()
 
         if maximal_verbose:
             all_nodes = self.tree_representation.tree.all_nodes()
-            logger.info(f"Total nodes in DOM tree: {len(all_nodes)}")
+            logger.debug(f"Total nodes in DOM tree: {len(all_nodes)}")
             for node in all_nodes:
                 if node.data is not None:
-                    logger.info(
+                    logger.debug(
                         f"Node XPath: {node.identifier}, "
                         f"HTML length: {node.data.html_length}, "
                         f"Text length: {node.data.text_length}"
                     )
 
-        if verbose or maximal_verbose:
-            logger.info(" > Computing tree regions system:")
+        logger.info("Step 2/3: Computing tree regions system")
         self.compute_tree_regions_system()
 
         if maximal_verbose:
             roi_count = len(self.tree_regions_system.sorted_roi_by_pos_xpath)
-            logger.info(f"Total ROIs (chunks): {roi_count}")
+            logger.debug(f"Total ROIs (chunks): {roi_count}")
             for idx in self.tree_regions_system.sorted_roi_by_pos_xpath:
                 roi = self.tree_regions_system.sorted_roi_by_pos_xpath[idx]
-                logger.info(
+                logger.debug(
                     f"ROI {idx}: HTML length {roi.repr_length}, Nodes XPaths: {roi.pos_xpath_list}"
                 )
 
-        if verbose or maximal_verbose:
-            logger.info(" > Computing render:")
+        logger.info("Step 3/3: Computing render")
         self.compute_render_system()
 
         if maximal_verbose:
             for idx, html_chunk in self.render_system.html_render_roi.items():
                 text_chunk = self.render_system.text_render_roi.get(idx, "")
-                logger.info(
+                logger.debug(
                     f"Chunk {idx}: HTML {len(html_chunk)} chars, Text {len(text_chunk)} chars"
                 )
+
+        logger.info(
+            f"Processing complete: Generated {len(self.render_system.html_render_roi)} chunks"
+        )

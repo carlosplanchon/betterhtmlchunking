@@ -12,12 +12,14 @@ from betterhtmlchunking.tree_representation import\
     DOMTreeRepresentation
 from betterhtmlchunking.tree_representation import\
     get_xpath_depth
+from betterhtmlchunking.logging_config import get_logger
 
 from enum import StrEnum
 
 from typing import Optional
 
-# import prettyprinter
+# Module logger
+logger = get_logger("tree_regions_system")
 
 
 #################################
@@ -217,15 +219,16 @@ class TreeRegionsSystem:
     def __attrs_post_init__(self):
         self.start()
 
-    def print_tree_node_states(self):
-        print("--- PRINT TREE NODE STATES ---")
+    def log_tree_node_states(self):
+        """Log detailed information about all tree nodes (DEBUG level)."""
+        logger.debug("--- TREE NODE STATES ---")
         for pos_xpath in self.tree_representation.pos_xpaths_list:
             pad: str = get_xpath_depth(xpath=pos_xpath) * " " * 4
             node = self.tree_representation.tree.get_node(pos_xpath)
-            print(f"{pad}|")
-            print(f"{pad}| {pos_xpath}")
-            print(f"{pad}| Text length: {node.data.text_length}")
-            print(f"{pad}| HTML length: {node.data.html_length}")
+            logger.debug(f"{pad}|")
+            logger.debug(f"{pad}| {pos_xpath}")
+            logger.debug(f"{pad}| Text length: {node.data.text_length}")
+            logger.debug(f"{pad}| HTML length: {node.data.html_length}")
 
     def get_node_repr_length(self, node: treelib.Node) -> int:
         match self.repr_length_compared_by:
@@ -237,6 +240,8 @@ class TreeRegionsSystem:
         return node_repr_length
 
     def start(self):
+        """Process the DOM tree and identify regions of interest."""
+        logger.debug("Starting tree regions system processing")
         self.regions_of_interest_list: list[RegionOfInterest] = []
 
         subtrees_queue = queue.Queue()
@@ -248,26 +253,28 @@ class TreeRegionsSystem:
         elif self.tree_representation.pos_xpaths_list:
             root_xpath = self.tree_representation.pos_xpaths_list[0]
         else:
+            logger.warning("No nodes found in tree representation")
             self.sorted_roi_by_pos_xpath = {}
             return
 
+        logger.debug(f"Starting from root xpath: {root_xpath}")
         subtrees_queue.put(root_xpath)
 
+        nodes_processed = 0
         while subtrees_queue.empty() is False:
-            # print("#" * 100)
             node_xpath: str = subtrees_queue.get()
-            # print("--- NODE XPATH ---")
-            # print(node_xpath)
+            nodes_processed += 1
+            logger.debug(f"Processing node [{nodes_processed}]: {node_xpath}")
 
             node: treelib.Node = self.tree_representation.tree.get_node(
                 node_xpath
             )
-            # print(node.data.text_length)
 
             children_tags: list[str] =\
                 self.tree_representation.get_children_tag_list(
                     xpath=node_xpath
                 )
+            logger.debug(f"Node has {len(children_tags)} children")
 
             region_of_interest_maker = ROIMaker(
                 node_xpath=node_xpath,
@@ -277,35 +284,24 @@ class TreeRegionsSystem:
                 repr_length_compared_by=self.repr_length_compared_by
             )
 
-            # print("--- REGIONS OF INTEREST LIST ---")
-            # prettyprinter.cpprint(region_of_interest_maker.regions_of_interest_list)
+            logger.debug(
+                f"ROIMaker created {len(region_of_interest_maker.regions_of_interest_list)} ROIs "
+                f"and {len(region_of_interest_maker.children_to_enqueue)} children to enqueue"
+            )
 
             for roi in region_of_interest_maker.regions_of_interest_list:
                 # If we are based on text_length,
                 # tags like img (text_length == 0) are ignored.
                 # For that reason we base ROI on pos_xpath_list.
-                # if roi.text_length > 0:
                 if roi.pos_xpath_list != []:
                     self.regions_of_interest_list.append(roi)
 
-            # print("--- CHILDREN TO ENQUEUE ---")
-            # prettyprinter.cpprint(region_of_interest_maker.children_to_enqueue)
-
-            """
-            Try to make ROIs under.
-            If ROI occupy all children, ROI contains node itself.
-
-            Those elements who are not ROI, are put into queue.
-            Elements who are ROI, are put into a separate dict.
-            """
-
+            # Enqueue children that need deeper processing
             for child_tag in region_of_interest_maker.children_to_enqueue:
                 subtrees_queue.put(child_tag)
 
-            """
-            for child_tag in children_tags:
-                subtrees_queue.put(child_tag)
-            """
+        logger.debug(f"Processed {nodes_processed} nodes total")
+        logger.info(f"Found {len(self.regions_of_interest_list)} regions of interest")
 
         sorted_regions: list[RegionOfInterest] =\
             order_regions_of_interest_by_pos_xpath(
@@ -315,11 +311,14 @@ class TreeRegionsSystem:
                 self.tree_representation.pos_xpaths_list
             )
 
-        # This happen when there are no nodes to detect as RegionOfInterest
+        # This happens when there are no nodes to detect as RegionOfInterest
         # or when max_node_repr_length is greater than total repr_length in
         # the document.
         if sorted_regions == [] and\
                 len(self.tree_representation.pos_xpaths_list) > 0:
+            logger.info(
+                "No ROIs found with current settings, using entire document as single ROI"
+            )
             node_xpath: str = self.tree_representation.pos_xpaths_list[0]
 
             node: treelib.Node = self.tree_representation.tree.get_node(
@@ -329,7 +328,6 @@ class TreeRegionsSystem:
             node_repr_length: int = self.get_node_repr_length(
                 node=node
             )
-            # print(node_repr_length)
 
             roi = RegionOfInterest()
             roi.pos_xpath_list = [node_xpath]
@@ -339,3 +337,4 @@ class TreeRegionsSystem:
             sorted_regions = [roi]
 
         self.sorted_roi_by_pos_xpath = dict(enumerate(sorted_regions))
+        logger.info(f"Created {len(self.sorted_roi_by_pos_xpath)} final sorted chunks")

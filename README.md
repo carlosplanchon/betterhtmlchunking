@@ -1,5 +1,7 @@
 # betterhtmlchunking
 
+![Banner](assets/banner.jpg)
+
 A Python library for intelligently chunking HTML documents into structured, size-limited segments based on DOM tree analysis.
 
 ## Our Discord Server:
@@ -177,7 +179,11 @@ You can even combine the two techniques if you need both **structured extraction
 
 ## CLI
 
-The package ships with a small command line interface built with [Typer](https://typer.tiangolo.com/). You can pipe HTML to the tool and obtain a specific chunk as HTML:
+The package ships with a command line interface built with [Typer](https://typer.tiangolo.com/). You can pipe HTML to the tool and work with chunks in multiple ways.
+
+### Basic Usage - Single Chunk
+
+Get a specific chunk as HTML:
 
 ```bash
 cat input.html | betterhtmlchunking --max-length 32768 --chunk-index 0 > chunk.html
@@ -185,17 +191,98 @@ cat input.html | betterhtmlchunking --max-length 32768 --chunk-index 0 > chunk.h
 
 By default the command reads from `stdin`, processes chunks up to a maximum length of 32,768 characters, and prints the HTML corresponding to chunk index `0` to `stdout`.
 
-### Verbose mode
+### List All Chunks
 
-You can enable progress logging with `--verbose`. Logs are written to `stderr` so they don’t interfere with chunk output:
+See how many chunks are created and their sizes without processing the full content:
 
 ```bash
-cat input.html | betterhtmlchunking --max-length 32768 --chunk-index 0 --verbose > chunk.html
+cat input.html | betterhtmlchunking --max-length 32768 --list-chunks
+```
+
+Output:
+```
+Total chunks: 5
+Chunk 0: 28543 chars HTML, 12834 chars text
+Chunk 1: 31245 chars HTML, 15234 chars text
+Chunk 2: 19823 chars HTML, 9234 chars text
+...
+```
+
+### Save All Chunks
+
+Extract all chunks to separate files:
+
+```bash
+cat input.html | betterhtmlchunking --max-length 32768 --all-chunks --output-dir ./chunks
+```
+
+This creates `chunk_0.html`, `chunk_1.html`, etc. in the specified directory.
+
+### Text-Only Output
+
+Get plain text content without HTML markup:
+
+```bash
+# Single chunk as text
+cat input.html | betterhtmlchunking --max-length 32768 --chunk-index 0 --text-only > chunk.txt
+
+# All chunks as text files
+cat input.html | betterhtmlchunking --max-length 32768 --all-chunks --text-only --output-dir ./chunks
+```
+
+This creates `chunk_0.txt`, `chunk_1.txt`, etc. with plain text content.
+
+### JSON Output
+
+Get structured JSON output with all chunks and metadata:
+
+```bash
+cat input.html | betterhtmlchunking --max-length 32768 --format json > output.json
+```
+
+Output format:
+```json
+{
+  "total_chunks": 5,
+  "max_length": 32768,
+  "compared_by": "html",
+  "chunks": [
+    {
+      "index": 0,
+      "html": "<h1>...</h1>",
+      "text": "...",
+      "html_length": 28543,
+      "text_length": 12834
+    },
+    ...
+  ]
+}
+```
+
+This is useful for programmatic processing. You can pipe the output to tools like `jq` or process it with scripts:
+
+```bash
+# Extract only text from all chunks
+cat input.html | betterhtmlchunking --format json | jq -r '.chunks[].text'
+
+# Get chunk count
+cat input.html | betterhtmlchunking --format json | jq '.total_chunks'
+
+# Filter chunks by size
+cat input.html | betterhtmlchunking --format json | jq '.chunks[] | select(.text_length > 1000)'
+```
+
+### Verbose Mode
+
+Enable progress logging with `--verbose`. Logs are written to `stderr` so they don't interfere with chunk output:
+
+```bash
+cat input.html | betterhtmlchunking --max-length 32768 --all-chunks --output-dir ./chunks --verbose
 ```
 
 ### Maximal Verbose Mode
 
-For a detailed inspection of the DOM, nodes, ROIs, and chunk lengths, use `--maximal-verbose`. This logs:
+For detailed inspection of the DOM, nodes, ROIs, and chunk lengths, use `--maximal-verbose`. This logs:
 
 * Total DOM nodes and their HTML/text lengths
 * Each ROI (region of interest) with constituent node XPaths and lengths
@@ -209,6 +296,21 @@ cat input.html | betterhtmlchunking --max-length 32768 --chunk-index 0 --maximal
 * `logs.txt` captures all detailed logging information.
 
 This mode is useful for debugging, testing, or analyzing how the document is split into chunks.
+
+### CLI Options Summary
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--max-length` | `-l` | Maximum length for each chunk (default: 32768) |
+| `--chunk-index` | `-c` | Index of specific chunk to output (default: 0) |
+| `--list-chunks` | | List all chunks with their sizes |
+| `--all-chunks` | | Output all chunks (requires `--output-dir`) |
+| `--output-dir` | `-o` | Directory to save chunks when using `--all-chunks` |
+| `--text-only` | | Output plain text instead of HTML |
+| `--format` | `-f` | Output format: `json` for structured JSON output |
+| `--text` | | Compare length using text instead of HTML |
+| `--verbose` | `-v` | Enable progress logging |
+| `--maximal-verbose` | | Enable detailed debug logging |
 
 ---
 

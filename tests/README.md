@@ -41,6 +41,7 @@ pytest tests/ --cov=betterhtmlchunking --cov-report=html
 - `test_tree_representation.py` - Tests for DOM tree representation
 - `test_tree_regions_system.py` - Tests for ROI detection system
 - `test_utils.py` - Tests for utility functions
+- `test_cli.py` - Tests for command-line interface functionality
 
 ## Test Coverage
 
@@ -51,3 +52,11 @@ The test suite covers:
 - Tag filtering functionality
 - Edge cases (empty HTML, malformed HTML, deeply nested structures)
 - API integration and full processing pipeline
+- CLI functionality:
+  - Basic command-line operations
+  - `--list-chunks` for listing chunk information
+  - `--all-chunks` for saving all chunks to files
+  - `--text-only` for plain text output
+  - `--format json` for structured JSON output
+  - Verbosity levels and logging
+  - Integration between CLI features

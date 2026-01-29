@@ -12,6 +12,11 @@ from betterhtmlchunking.tree_representation import\
 from betterhtmlchunking.tree_regions_system import\
     TreeRegionsSystem
 
+from betterhtmlchunking.logging_config import get_logger
+
+# Module logger
+logger = get_logger("render_system")
+
 
 RegionOfInterestRenderT = dict[int, str]
 
@@ -57,6 +62,9 @@ class RenderSystem:
         )
 
     def render(self) -> None:
+        """Render HTML and text output for all regions of interest."""
+        logger.debug("Starting render process")
+
         self.html_render_with_pos_xpath: dict[
             int, RegionOfInterestRenderT] = {}
         self.text_render_with_pos_xpath: dict[
@@ -65,19 +73,20 @@ class RenderSystem:
         self.html_render_roi: dict[int, str] = {}
         self.text_render_roi: dict[int, str] = {}
 
+        total_rois = len(self.tree_regions_system.sorted_roi_by_pos_xpath)
+        logger.info(f"Rendering {total_rois} regions of interest")
+
         region_of_interest_idx: int = 0
 
-        # Execute the function:
         for roi_idx, roi in\
                 self.tree_regions_system.sorted_roi_by_pos_xpath.items():
+            logger.debug(f"Rendering ROI {roi_idx} with {len(roi.pos_xpath_list)} xpaths")
+
             self.html_render_with_pos_xpath[roi_idx] = {}
             self.text_render_with_pos_xpath[roi_idx] = {}
 
-            # print("*" * 50)
-            # print(roi.pos_xpath_list)
-
             for pos_xpath in roi.pos_xpath_list:
-                # print(pos_xpath)
+                logger.debug(f"Processing xpath: {pos_xpath}")
 
                 # HTML render:
                 prettified_pos_xpath_html: str =\
@@ -85,7 +94,6 @@ class RenderSystem:
                         pos_xpath].bs4_elem.prettify(
                             formatter="minimal"
                         )
-                # print(prettified_pos_xpath_html)
 
                 # Text render:
                 pos_xpath_text: str =\
@@ -110,6 +118,14 @@ class RenderSystem:
                 self.get_roi_text_render_with_pos_xpath(
                     roi_idx=roi_idx
                 )
+
+            logger.debug(
+                f"ROI {roi_idx} rendered: "
+                f"{len(self.html_render_roi[roi_idx])} chars HTML, "
+                f"{len(self.text_render_roi[roi_idx])} chars text"
+            )
+
+        logger.info(f"Render complete: {total_rois} chunks generated")
 
     def __attrs_post_init__(self):
         self.render()

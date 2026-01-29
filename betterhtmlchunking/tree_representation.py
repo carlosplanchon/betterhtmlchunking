@@ -11,9 +11,10 @@ import bs4
 
 from typing import Any
 
-# import prettyprinter
+from betterhtmlchunking.logging_config import get_logger
 
-# prettyprinter.install_extras()
+# Module logger
+logger = get_logger("tree_representation")
 
 
 def get_parent_xpath(xpath: str) -> str:
@@ -111,16 +112,24 @@ class DOMTreeRepresentation:
         self.start()
 
     def make_html_soup(self):
+        """Parse HTML content into BeautifulSoup object."""
+        logger.debug("Parsing HTML with BeautifulSoup (lxml)")
         self.soup = bs4.BeautifulSoup(
             self.website_code,
             features="lxml"
         )
+        logger.debug("HTML parsing complete")
 
     def compute_xpaths_data(self):
+        """Compute metadata for all elements in the HTML."""
+        logger.debug("Computing xpaths and metadata for all elements")
+
         children = self.soup.find_all(
             name=True,
             recursive=True
         )
+
+        logger.info(f"Found {len(children)} HTML elements to process")
 
         self.xpaths_metadata: dict[str, Any] = {}
 
@@ -146,7 +155,12 @@ class DOMTreeRepresentation:
 
             self.xpaths_metadata[pos_xpath] = node_metadata
 
+        logger.debug(f"Computed metadata for {len(self.xpaths_metadata)} xpaths")
+
     def make_tree_representation(self):
+        """Build the tree representation from xpath metadata."""
+        logger.debug("Building tree representation")
+
         # Initialize the tree.
         self.tree = treelib.Tree()
 
@@ -192,19 +206,22 @@ class DOMTreeRepresentation:
         return children_tags
 
     def delete_node(self, pos_xpath: str) -> None:
+        """Delete a node from the tree and all associated metadata."""
+        logger.debug(f"Deleting node: {pos_xpath}")
+
         # Delete on treelib.Tree:
         self.tree.remove_node(pos_xpath)
-        # print(self.tree)
 
         # Delete on soup:
         node = self.xpaths_metadata[pos_xpath].bs4_elem
         node.decompose()
-        # print(self.soup.prettify())
 
         keys_to_remove: list[str] = [
             xpath for xpath in self.pos_xpaths_list
             if xpath.startswith(pos_xpath)
         ]
+
+        logger.debug(f"Removing {len(keys_to_remove)} child nodes")
 
         # Delete on metadata all which start with pos_xpath:
         for xpath in keys_to_remove:
