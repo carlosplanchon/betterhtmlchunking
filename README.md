@@ -1,6 +1,7 @@
 # betterhtmlchunking
 
-![Banner](assets/banner.jpg)
+![Banner](https://raw.githubusercontent.com/carlosplanchon/betterhtmlchunking/main/assets/banner.jpg)
+
 
 A Python library for intelligently chunking HTML documents into structured, size-limited segments based on DOM tree analysis.
 

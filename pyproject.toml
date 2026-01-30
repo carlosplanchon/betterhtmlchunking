@@ -7,7 +7,7 @@ package = true
 
 [project]
 name = "betterhtmlchunking"
-version = "0.9.5"
+version = "0.9.6"
 description = "A Python library for intelligent HTML segmentation and ROI extraction. It builds a DOM tree from raw HTML and extracts content-rich regions for efficient web scraping and analysis."
 readme = "README.md"
 requires-python = ">=3.12"
