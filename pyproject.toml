@@ -15,7 +15,6 @@ authors = [
   { name = "Carlos A. Planchón", email = "carlosandresplanchonprestes@gmail.com" }
 ]
 
-# SPDX (formato nuevo)
 license = "MIT"
 license-files = ["LICENSE"]
 
