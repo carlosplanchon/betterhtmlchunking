@@ -30,7 +30,7 @@ pip install betterhtmlchunking
 ```
 
 ### Dependencies
-- Python 3.12+
+- Python 3.11+
 - attrs
 - treelib
 - beautifulsoup4
