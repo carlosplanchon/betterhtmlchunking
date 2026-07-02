@@ -2,7 +2,7 @@
 
 ![Banner](https://raw.githubusercontent.com/carlosplanchon/betterhtmlchunking/main/assets/banner.jpg)
 
-[![CI](https://github.com/carlosplanchon/betterhtmlchunking/actions/workflows/tests.yml/badge.svg)](https://github.com/carlosplanchon/betterhtmlchunking/actions/workflows/tests.yml)
+[![CI](https://github.com/carlosplanchon/betterhtmlchunking/actions/workflows/ci.yml/badge.svg)](https://github.com/carlosplanchon/betterhtmlchunking/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/betterhtmlchunking.svg)](https://pypi.org/project/betterhtmlchunking/)
 [![Python versions](https://img.shields.io/pypi/pyversions/betterhtmlchunking.svg)](https://pypi.org/project/betterhtmlchunking/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
@@ -16,8 +16,6 @@ A Python library for intelligently chunking HTML documents into structured, size
 ## Overview
 
 This library processes HTML content to split it into semantically coherent chunks while respecting specified size constraints. It analyzes the DOM structure to identify optimal split points, preserving contextual information and document hierarchy.
-
-### DeepWiki Docs: [https://deepwiki.com/carlosplanchon/betterhtmlchunking](https://deepwiki.com/carlosplanchon/betterhtmlchunking)
 
 ## Key Features
 
