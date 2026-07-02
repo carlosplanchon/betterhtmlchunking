@@ -2,6 +2,11 @@
 
 ![Banner](https://raw.githubusercontent.com/carlosplanchon/betterhtmlchunking/main/assets/banner.jpg)
 
+[![CI](https://github.com/carlosplanchon/betterhtmlchunking/actions/workflows/tests.yml/badge.svg)](https://github.com/carlosplanchon/betterhtmlchunking/actions/workflows/tests.yml)
+[![PyPI version](https://img.shields.io/pypi/v/betterhtmlchunking.svg)](https://pypi.org/project/betterhtmlchunking/)
+[![Python versions](https://img.shields.io/pypi/pyversions/betterhtmlchunking.svg)](https://pypi.org/project/betterhtmlchunking/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/carlosplanchon/betterhtmlchunking)
 
 A Python library for intelligently chunking HTML documents into structured, size-limited segments based on DOM tree analysis.
 
