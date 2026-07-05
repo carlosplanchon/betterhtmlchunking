@@ -36,7 +36,7 @@ pip install betterhtmlchunking
 - Python 3.10+
 - attrs
 - treelib
-- beautifulsoup4
+- parsel
 - parsel-text
 - lxml
 - attrs-strict

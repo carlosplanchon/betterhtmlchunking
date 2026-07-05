@@ -4,10 +4,11 @@ import attrs
 
 from attrs_strict import type_validator
 
-import parsel_text
-
-from betterhtmlchunking.tree_representation import\
-    DOMTreeRepresentation
+from betterhtmlchunking.tree_representation import (
+    DOMTreeRepresentation,
+    render_element_html,
+    get_element_text,
+)
 
 from betterhtmlchunking.tree_regions_system import\
     TreeRegionsSystem
@@ -88,23 +89,19 @@ class RenderSystem:
             for pos_xpath in roi.pos_xpath_list:
                 logger.debug(f"Processing xpath: {pos_xpath}")
 
-                # HTML render:
-                prettified_pos_xpath_html: str =\
+                lxml_elem = \
                     self.tree_regions_system.tree_representation.xpaths_metadata[
-                        pos_xpath].bs4_elem.prettify(
-                            formatter="minimal"
-                        )
+                        pos_xpath
+                    ].lxml_elem
+
+                # HTML render:
+                pos_xpath_html: str = render_element_html(lxml_elem)
 
                 # Text render:
-                pos_xpath_text: str =\
-                    parsel_text.get_bs4_soup_text(
-                        bs4_soup=self.tree_regions_system.tree_representation.xpaths_metadata[
-                            pos_xpath
-                        ].bs4_elem
-                    )
+                pos_xpath_text: str = get_element_text(lxml_elem)
 
                 self.html_render_with_pos_xpath[
-                    roi_idx][pos_xpath] = prettified_pos_xpath_html
+                    roi_idx][pos_xpath] = pos_xpath_html
                 self.text_render_with_pos_xpath[
                     roi_idx][pos_xpath] = pos_xpath_text
 

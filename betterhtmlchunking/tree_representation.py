@@ -4,10 +4,12 @@ import attrs
 from attrs_strict import type_validator
 
 import parsel_text
+from parsel import Selector
+
+import lxml.html
+import lxml.etree
 
 import treelib
-
-import bs4
 
 from typing import Any
 
@@ -33,26 +35,27 @@ def get_children_tags(node):
     return [child.tag for child in node]
 
 
-def get_pos_xpath_from_bs4_elem(element) -> str:
-    components = []
-    child = element if isinstance(element, bs4.Tag) else element.parent
+def render_element_html(element) -> str:
+    """Serialise an lxml element to HTML markup.
 
-    for parent in child.parents:
-        siblings = parent.find_all(child.name, recursive=False)
+    Non-pretty HTML5 serialisation (no added indentation), so the length of
+    the result reflects the real markup size. This same function backs both
+    the ``html_length`` metric and the rendered chunk output, which keeps the
+    size metric equal to what callers actually receive. ``with_tail=False``
+    keeps the element's trailing text (which belongs to the parent) out of
+    the element's own HTML.
+    """
+    return lxml.html.tostring(
+        element,
+        pretty_print=False,
+        encoding="unicode",
+        with_tail=False,
+    )
 
-        if len(siblings) == 1:
-            component = child.name
-        else:
-            index = next(
-                i for i, s in enumerate(siblings, 1) if s is child
-            )
-            component = f"{child.name}[{index}]"
 
-        components.append(component)
-        child = parent
-
-    components.reverse()
-    return "/" + "/".join(components)
+def get_element_text(element) -> str:
+    """Extract normalised text from an lxml element (parsel-native)."""
+    return parsel_text.get_xpath_text(Selector(root=element), ".")
 
 
 @attrs.define()
@@ -69,7 +72,7 @@ class NodeMetadata:
         validator=type_validator(),
         init=False
     )
-    bs4_elem: Any = attrs.field(
+    lxml_elem: Any = attrs.field(
         validator=type_validator(),
         init=False
     )
@@ -84,7 +87,7 @@ class DOMTreeRepresentation:
     website_code: str = attrs.field(
         validator=type_validator()
     )
-    soup: bs4.BeautifulSoup = attrs.field(
+    root: Any = attrs.field(
         validator=type_validator(),
         init=False
     )
@@ -111,47 +114,43 @@ class DOMTreeRepresentation:
     def __attrs_post_init__(self):
         self.start()
 
-    def make_html_soup(self):
-        """Parse HTML content into BeautifulSoup object."""
-        logger.debug("Parsing HTML with BeautifulSoup (lxml)")
-        self.soup = bs4.BeautifulSoup(
-            self.website_code,
-            features="lxml"
-        )
+    def parse_html(self):
+        """Parse HTML content into an lxml element tree."""
+        logger.debug("Parsing HTML with lxml.html")
+        try:
+            self.root = lxml.html.document_fromstring(self.website_code)
+        except lxml.etree.ParserError:
+            # Empty / whitespace-only input: fall back to an empty document.
+            self.root = lxml.html.document_fromstring("<html></html>")
         logger.debug("HTML parsing complete")
 
     def compute_xpaths_data(self):
         """Compute metadata for all elements in the HTML."""
         logger.debug("Computing xpaths and metadata for all elements")
 
-        children = self.soup.find_all(
-            name=True,
-            recursive=True
-        )
+        roottree = self.root.getroottree()
+        elements = [
+            element for element in self.root.iter()
+            if isinstance(element.tag, str)
+        ]
 
-        logger.info(f"Found {len(children)} HTML elements to process")
+        logger.info(f"Found {len(elements)} HTML elements to process")
 
         self.xpaths_metadata: dict[str, Any] = {}
 
-        for child in children:
-            pos_xpath: str = get_pos_xpath_from_bs4_elem(
-                element=child
-            )
+        for element in elements:
+            pos_xpath: str = roottree.getpath(element)
 
-            child_text: str = parsel_text.get_bs4_soup_text(
-                bs4_soup=child
-            )
+            child_text: str = get_element_text(element)
             text_length: int = len(child_text)
 
-            child_html: str = child.prettify(
-                formatter="minimal"
-            )
+            child_html: str = render_element_html(element)
             html_length: int = len(child_html)
 
             node_metadata = NodeMetadata()
             node_metadata.text_length = text_length
             node_metadata.html_length = html_length
-            node_metadata.bs4_elem = child
+            node_metadata.lxml_elem = element
 
             self.xpaths_metadata[pos_xpath] = node_metadata
 
@@ -212,9 +211,11 @@ class DOMTreeRepresentation:
         # Delete on treelib.Tree:
         self.tree.remove_node(pos_xpath)
 
-        # Delete on soup:
-        node = self.xpaths_metadata[pos_xpath].bs4_elem
-        node.decompose()
+        # Delete on the lxml tree (removes the element and its subtree):
+        element = self.xpaths_metadata[pos_xpath].lxml_elem
+        parent = element.getparent()
+        if parent is not None:
+            parent.remove(element)
 
         keys_to_remove: list[str] = [
             xpath for xpath in self.pos_xpaths_list
@@ -240,5 +241,5 @@ class DOMTreeRepresentation:
         self.sort_pos_xpaths()
 
     def start(self):
-        self.make_html_soup()
+        self.parse_html()
         self.recompute_representation()

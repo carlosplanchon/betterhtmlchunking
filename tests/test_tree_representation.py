@@ -2,6 +2,18 @@
 
 from betterhtmlchunking.tree_representation import DOMTreeRepresentation
 from betterhtmlchunking.tree_representation import get_xpath_depth
+from betterhtmlchunking.tree_representation import (
+    render_element_html,
+    get_element_text,
+)
+
+import lxml.html
+
+
+def _element(html: str, tag: str):
+    """Parse *html* and return the first element matching *tag* (lxml)."""
+    root = lxml.html.document_fromstring(html)
+    return root if root.tag == tag else root.find(".//" + tag)
 
 
 class TestGetXPathDepth:
@@ -170,3 +182,113 @@ class TestDOMTreeRepresentation:
         p_xpath = [x for x in tree.pos_xpaths_list if "/p" in x][0]
         depth = get_xpath_depth(p_xpath)
         assert depth >= 5
+
+
+class TestRenderElementHtml:
+    """render_element_html: non-pretty HTML5 serialisation backing A''."""
+
+    def test_compact_no_indentation(self):
+        """Nested markup renders compactly (no bs4-style prettify inflation)."""
+        html = "<html><body><div><p>Hi</p></div></body></html>"
+        assert render_element_html(_element(html, "div")) == "<div><p>Hi</p></div>"
+
+    def test_no_added_newlines(self):
+        """Output carries no added indentation newlines (real markup size)."""
+        html = "<html><body><ul><li>a</li><li>b</li></ul></body></html>"
+        out = render_element_html(_element(html, "ul"))
+        assert out == "<ul><li>a</li><li>b</li></ul>"
+        assert "\n" not in out
+
+    def test_attribute_source_order_preserved(self):
+        """Attributes keep document order (bs4.prettify alphabetised them)."""
+        html = "<html><body><a href='u' class='c' id='i'>t</a></body></html>"
+        assert (
+            render_element_html(_element(html, "a"))
+            == '<a href="u" class="c" id="i">t</a>'
+        )
+
+    def test_void_elements_html5(self):
+        """Void elements use HTML5 form (no XML self-closing slash)."""
+        html = "<html><body><div><img src='x.jpg'><br></div></body></html>"
+        assert (
+            render_element_html(_element(html, "div"))
+            == '<div><img src="x.jpg"><br></div>'
+        )
+
+    def test_empty_element_is_valid_html5(self):
+        """Empty non-void elements render as <tag></tag>, never <tag/>."""
+        html = "<html><body><div></div></body></html>"
+        assert render_element_html(_element(html, "div")) == "<div></div>"
+
+    def test_entities_escaped(self):
+        """Special characters stay escaped in the markup."""
+        html = "<html><body><p>a &amp; b &lt; c</p></body></html>"
+        assert render_element_html(_element(html, "p")) == "<p>a &amp; b &lt; c</p>"
+
+    def test_non_ascii_preserved(self):
+        """Non-ASCII text is kept as unicode, not numeric entities."""
+        html = "<html><body><p>café — über</p></body></html>"
+        assert render_element_html(_element(html, "p")) == "<p>café — über</p>"
+
+    def test_tail_text_excluded(self):
+        """with_tail=False: trailing text (belongs to the parent) is excluded."""
+        html = "<html><body><p>foo <b>bar</b> baz</p></body></html>"
+        assert render_element_html(_element(html, "b")) == "<b>bar</b>"
+
+
+class TestGetElementText:
+    """get_element_text: parsel-native text extraction."""
+
+    def test_block_elements_joined_with_newline(self):
+        html = "<html><body><div><p>A</p><p>B</p></div></body></html>"
+        assert get_element_text(_element(html, "div")) == "A\nB"
+
+    def test_entities_decoded_in_text(self):
+        html = "<html><body><p>a &amp; b</p></body></html>"
+        assert get_element_text(_element(html, "p")) == "a & b"
+
+
+class TestHtmlLengthCoherence:
+    """A'' contract: the size metric equals the delivered markup."""
+
+    def test_node_html_length_equals_rendered_length(self):
+        """Every node's html_length == len(render_element_html(its element))."""
+        html = """
+        <html><body>
+            <section><h1>Title</h1><p>One</p><p>Two</p></section>
+            <div><ul><li>x</li><li>y</li></ul></div>
+        </body></html>
+        """
+        tree = DOMTreeRepresentation(website_code=html)
+        assert len(tree.pos_xpaths_list) > 0
+        for xpath in tree.pos_xpaths_list:
+            node = tree.tree.get_node(xpath)
+            expected = len(render_element_html(node.data.lxml_elem))
+            assert node.data.html_length == expected
+
+    def test_text_length_equals_extracted_text_length(self):
+        """Every node's text_length == len(get_element_text(its element))."""
+        html = "<html><body><div><p>Hello</p><p>World</p></div></body></html>"
+        tree = DOMTreeRepresentation(website_code=html)
+        for xpath in tree.pos_xpaths_list:
+            node = tree.tree.get_node(xpath)
+            expected = len(get_element_text(node.data.lxml_elem))
+            assert node.data.text_length == expected
+
+
+class TestPositionalXpath:
+    """Positional xpaths generated via lxml getpath()."""
+
+    def test_siblings_get_indices(self):
+        html = "<html><body><p>1</p><p>2</p><p>3</p></body></html>"
+        tree = DOMTreeRepresentation(website_code=html)
+        xpaths = tree.pos_xpaths_list
+        assert "/html/body/p[1]" in xpaths
+        assert "/html/body/p[2]" in xpaths
+        assert "/html/body/p[3]" in xpaths
+
+    def test_unique_elements_have_no_index(self):
+        html = "<html><body><div>only</div></body></html>"
+        tree = DOMTreeRepresentation(website_code=html)
+        assert "/html/body/div" in tree.pos_xpaths_list
+        assert "/html/body" in tree.pos_xpaths_list
