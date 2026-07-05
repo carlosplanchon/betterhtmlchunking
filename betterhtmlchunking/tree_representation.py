@@ -11,6 +11,8 @@ import lxml.etree
 
 import treelib
 
+import functools
+
 from typing import Any
 
 from betterhtmlchunking.logging_config import get_logger
@@ -64,14 +66,6 @@ class NodeMetadata:
         validator=type_validator(),
         init=False
     )
-    text_length: int = attrs.field(
-        validator=type_validator(),
-        init=False
-    )
-    html_length: int = attrs.field(
-        validator=type_validator(),
-        init=False
-    )
     lxml_elem: Any = attrs.field(
         validator=type_validator(),
         init=False
@@ -80,6 +74,16 @@ class NodeMetadata:
         validator=type_validator(),
         default=None
     )
+
+    # Lazy, cached size metrics: computed on first access (and only for the
+    # nodes the chunker/renderer actually touch), not eagerly for every node.
+    @functools.cached_property
+    def text_length(self) -> int:
+        return len(get_element_text(self.lxml_elem))
+
+    @functools.cached_property
+    def html_length(self) -> int:
+        return len(render_element_html(self.lxml_elem))
 
 
 @attrs.define()
@@ -125,7 +129,12 @@ class DOMTreeRepresentation:
         logger.debug("HTML parsing complete")
 
     def compute_xpaths_data(self):
-        """Compute metadata for all elements in the HTML."""
+        """Compute per-element metadata (xpath + element reference).
+
+        Text/HTML lengths are intentionally NOT computed here: they are lazy
+        cached properties on ``NodeMetadata``, so only the nodes the chunker
+        and renderer actually touch pay the serialisation cost.
+        """
         logger.debug("Computing xpaths and metadata for all elements")
 
         roottree = self.root.getroottree()
@@ -141,15 +150,7 @@ class DOMTreeRepresentation:
         for element in elements:
             pos_xpath: str = roottree.getpath(element)
 
-            child_text: str = get_element_text(element)
-            text_length: int = len(child_text)
-
-            child_html: str = render_element_html(element)
-            html_length: int = len(child_html)
-
             node_metadata = NodeMetadata()
-            node_metadata.text_length = text_length
-            node_metadata.html_length = html_length
             node_metadata.lxml_elem = element
 
             self.xpaths_metadata[pos_xpath] = node_metadata
