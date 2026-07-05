@@ -14,7 +14,16 @@ from betterhtmlchunking.tree_representation import\
     get_xpath_depth
 from betterhtmlchunking.logging_config import get_logger
 
-from enum import StrEnum
+import sys
+
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+else:  # Python 3.10 backport of StrEnum
+    from enum import Enum
+
+    class StrEnum(str, Enum):
+        __str__ = str.__str__
+        __format__ = str.__format__
 
 from typing import Optional
 
