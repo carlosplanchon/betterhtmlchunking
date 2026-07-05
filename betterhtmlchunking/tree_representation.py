@@ -13,7 +13,7 @@ import treelib
 
 import functools
 
-from typing import Any
+from typing import Any, Optional
 
 from betterhtmlchunking.logging_config import get_logger
 
@@ -30,6 +30,15 @@ def get_parent_xpath(xpath: str) -> str:
 def get_xpath_depth(xpath: str) -> int:
     xpath: str = xpath.rstrip("/")
     return xpath.count("/")
+
+
+def wanted_xpath(
+    xpath: str,
+    tag_list_to_filter_out: list[str]
+        ) -> bool:
+    """Check if an xpath should be kept based on the filter list."""
+    # Kept unless any of the unwanted tags appears in the xpath.
+    return not any(tag in xpath for tag in tag_list_to_filter_out)
 
 
 def get_children_tags(node):
@@ -108,6 +117,10 @@ class DOMTreeRepresentation:
         validator=type_validator(),
         default=True
     )
+    tag_list_to_filter_out: Optional[list[str]] = attrs.field(
+        validator=type_validator(),
+        default=None
+    )
     root: Any = attrs.field(
         validator=type_validator(),
         init=False
@@ -144,6 +157,32 @@ class DOMTreeRepresentation:
             # Empty / whitespace-only input: fall back to an empty document.
             self.root = lxml.html.document_fromstring("<html></html>")
         logger.debug("HTML parsing complete")
+
+    def filter_unwanted_tags(self):
+        """Prune unwanted elements directly on the lxml tree.
+
+        Done before building the treelib tree so the structure is computed
+        only once (instead of building it for every node and then rebuilding
+        after node-by-node deletion).
+        """
+        if not self.tag_list_to_filter_out:
+            return
+
+        roottree = self.root.getroottree()
+        to_remove = [
+            element for element in self.root.iter()
+            if isinstance(element.tag, str)
+            and not wanted_xpath(
+                roottree.getpath(element), self.tag_list_to_filter_out
+            )
+        ]
+
+        for element in to_remove:
+            parent = element.getparent()
+            if parent is not None:
+                parent.remove(element)
+
+        logger.info(f"Filtered {len(to_remove)} unwanted elements")
 
     def compute_xpaths_data(self):
         """Compute per-element metadata (xpath + element reference).
@@ -261,4 +300,5 @@ class DOMTreeRepresentation:
 
     def start(self):
         self.parse_html()
+        self.filter_unwanted_tags()
         self.recompute_representation()
