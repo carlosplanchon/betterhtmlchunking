@@ -7,11 +7,9 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/betterhtmlchunking.svg)](https://pypi.org/project/betterhtmlchunking/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/carlosplanchon/betterhtmlchunking)
+[![Discord](https://img.shields.io/badge/Discord-Join%20server-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/EgXeu9qnrR)
 
 A Python library for intelligently chunking HTML documents into structured, size-limited segments based on DOM tree analysis.
-
-## Our Discord Server:
-[https://discord.gg/2uVF5FZg](https://discord.gg/EgXeu9qnrR)
 
 ## Overview
 
@@ -274,6 +272,21 @@ cat input.html | betterhtmlchunking --format json | jq '.total_chunks'
 
 # Filter chunks by size
 cat input.html | betterhtmlchunking --format json | jq '.chunks[] | select(.text_length > 1000)'
+```
+
+#### With nushell
+
+If you use [nushell](https://www.nushell.sh/), the JSON output parses into a native table you can query directly — no manual JSON handling:
+
+```nu
+# Chunks as a table with their sizes
+open --raw input.html | betterhtmlchunking --format json | from json | get chunks | select index html_length text_length
+
+# Filter chunks by size
+open --raw input.html | betterhtmlchunking --format json | from json | get chunks | where text_length > 1000
+
+# Chunk count
+open --raw input.html | betterhtmlchunking --format json | from json | get total_chunks
 ```
 
 ### Verbose Mode
