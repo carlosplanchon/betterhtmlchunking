@@ -227,8 +227,8 @@ class TestRenderElementHtml:
 
     def test_non_ascii_preserved(self):
         """Non-ASCII text is kept as unicode, not numeric entities."""
-        html = "<html><body><p>café — über</p></body></html>"
-        assert render_element_html(_element(html, "p")) == "<p>café — über</p>"
+        html = "<html><body><p>café über</p></body></html>"
+        assert render_element_html(_element(html, "p")) == "<p>café über</p>"
 
     def test_tail_text_excluded(self):
         """with_tail=False: trailing text (belongs to the parent) is excluded."""
@@ -312,7 +312,7 @@ class TestConstructorFiltering:
         assert any("/div" in x for x in xpaths)
 
     def test_no_filter_list_keeps_everything(self):
-        """Default (None) filters nothing — direct callers get the full tree."""
+        """Default (None) filters nothing, so direct callers get the full tree."""
         html = "<html><head><title>T</title></head><body><div>x</div></body></html>"
         tree = DOMTreeRepresentation(website_code=html)
         assert any("/head" in x for x in tree.pos_xpaths_list)

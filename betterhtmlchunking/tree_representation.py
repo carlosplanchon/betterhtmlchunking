@@ -68,8 +68,8 @@ def get_element_text(element, fix_mojibake: bool = True) -> str:
     """Extract normalised text from an lxml element (parsel-native).
 
     ``fix_mojibake`` (default True) runs the text through ``ftfy`` to repair
-    mis-encoded characters. Disabling it skips ftfy — noticeably faster in
-    TEXT_LENGTH mode, at the cost of not fixing mojibake.
+    mis-encoded characters. Disabling it skips ftfy and is noticeably faster
+    in TEXT_LENGTH mode, at the cost of not fixing mojibake.
     """
     return parsel_text.get_xpath_text(
         Selector(root=element), ".", fix_mojibake=fix_mojibake
