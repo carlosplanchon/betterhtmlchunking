@@ -6,7 +6,6 @@ import logging
 from typing import Optional
 
 from attrs_strict import type_validator
-from betterhtmlchunking.utils import remove_unwanted_tags
 from betterhtmlchunking.tree_representation import DOMTreeRepresentation
 from betterhtmlchunking.tree_regions_system import (
     TreeRegionsSystem,
@@ -78,13 +77,11 @@ class DomRepresentation:
             self.website_code = html.unescape(self.website_code)
 
     def compute_tree_representation(self):
+        # DOMTreeRepresentation prunes unwanted tags on the lxml tree and
+        # builds the tree structure in a single pass.
         self.tree_representation = DOMTreeRepresentation(
             website_code=self.website_code,
             fix_mojibake=self.fix_mojibake,
-        )
-        # remove_unwanted_tags prunes the lxml tree and recomputes once.
-        self.tree_representation = remove_unwanted_tags(
-            tree_representation=self.tree_representation,
             tag_list_to_filter_out=self.tag_list_to_filter_out,
         )
 

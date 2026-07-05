@@ -292,3 +292,27 @@ class TestPositionalXpath:
         tree = DOMTreeRepresentation(website_code=html)
         assert "/html/body/div" in tree.pos_xpaths_list
         assert "/html/body" in tree.pos_xpaths_list
+
+
+class TestConstructorFiltering:
+    """DOMTreeRepresentation prunes unwanted tags in one pass at build time."""
+
+    def test_tag_list_filters_at_construction(self):
+        html = (
+            "<html><head><title>T</title></head>"
+            "<body><div>keep</div><script>x</script></body></html>"
+        )
+        tree = DOMTreeRepresentation(
+            website_code=html,
+            tag_list_to_filter_out=["/head", "/script"],
+        )
+        xpaths = tree.pos_xpaths_list
+        assert not any("/head" in x for x in xpaths)
+        assert not any("/script" in x for x in xpaths)
+        assert any("/div" in x for x in xpaths)
+
+    def test_no_filter_list_keeps_everything(self):
+        """Default (None) filters nothing — direct callers get the full tree."""
+        html = "<html><head><title>T</title></head><body><div>x</div></body></html>"
+        tree = DOMTreeRepresentation(website_code=html)
+        assert any("/head" in x for x in tree.pos_xpaths_list)

@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 
-from betterhtmlchunking.tree_representation import DOMTreeRepresentation
+from betterhtmlchunking.tree_representation import (
+    DOMTreeRepresentation,
+    wanted_xpath,
+)
 from betterhtmlchunking.logging_config import get_logger
 
 # Module logger
 logger = get_logger("utils")
 
-
-def wanted_xpath(
-    xpath: str,
-    tag_list_to_filter_out: list[str]
-        ) -> bool:
-    """Check if an xpath should be kept based on filter list."""
-    # Check if any of the unwanted tags are present in the given XPath
-    return not any(tag in xpath for tag in tag_list_to_filter_out)
+# ``wanted_xpath`` is defined in tree_representation and re-exported here for
+# backward compatibility (tests and callers import it from utils).
 
 
 def remove_unwanted_tags(
