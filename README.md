@@ -276,7 +276,7 @@ cat input.html | betterhtmlchunking --format json | jq '.chunks[] | select(.text
 
 #### With nushell
 
-If you use [nushell](https://www.nushell.sh/), the JSON output parses into a native table you can query directly — no manual JSON handling:
+If you use [nushell](https://www.nushell.sh/), the JSON output parses into a native table you can query directly, with no manual JSON handling:
 
 ```nu
 # Chunks as a table with their sizes
