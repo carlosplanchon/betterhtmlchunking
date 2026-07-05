@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-import treelib
-
 from betterhtmlchunking.tree_representation import DOMTreeRepresentation
 from betterhtmlchunking.logging_config import get_logger
 
@@ -22,7 +20,12 @@ def remove_unwanted_tags(
     tree_representation: DOMTreeRepresentation,
     tag_list_to_filter_out: list[str]
         ):
-    """Remove nodes matching tags in the filter list."""
+    """Remove nodes matching tags in the filter list.
+
+    Single pass: every unwanted element is detached from the lxml tree in one
+    go, then the representation is recomputed once. This avoids deleting node
+    by node and re-sorting the entire xpath list on each removal (O(K*N log N)).
+    """
     logger.debug(f"Filtering unwanted tags: {tag_list_to_filter_out}")
 
     total_nodes = len(tree_representation.pos_xpaths_list)
@@ -33,11 +36,14 @@ def remove_unwanted_tags(
             xpath=pos_xpath,
             tag_list_to_filter_out=tag_list_to_filter_out
                 ) is False:
-            try:
-                tree_representation.delete_node(pos_xpath=pos_xpath)
+            element = tree_representation.xpaths_metadata[pos_xpath].lxml_elem
+            parent = element.getparent()
+            if parent is not None:
+                parent.remove(element)
                 removed_count += 1
-            except treelib.exceptions.NodeIDAbsentError:
-                logger.debug(f"Node already removed: {pos_xpath}")
+
+    # Rebuild the tree/xpaths once from the pruned lxml tree.
+    tree_representation.recompute_representation()
 
     logger.info(f"Filtered {removed_count} unwanted nodes out of {total_nodes} total")
     return tree_representation

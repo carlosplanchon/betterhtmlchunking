@@ -22,7 +22,7 @@ logger = get_logger("render_system")
 RegionOfInterestRenderT = dict[int, str]
 
 
-@attrs.define()
+@attrs.define(on_setattr=attrs.setters.NO_OP)
 class RenderSystem:
     tree_regions_system: TreeRegionsSystem = attrs.field(
         validator=type_validator()
@@ -89,16 +89,19 @@ class RenderSystem:
             for pos_xpath in roi.pos_xpath_list:
                 logger.debug(f"Processing xpath: {pos_xpath}")
 
-                lxml_elem = \
+                metadata = \
                     self.tree_regions_system.tree_representation.xpaths_metadata[
                         pos_xpath
-                    ].lxml_elem
+                    ]
+                lxml_elem = metadata.lxml_elem
 
                 # HTML render:
                 pos_xpath_html: str = render_element_html(lxml_elem)
 
                 # Text render:
-                pos_xpath_text: str = get_element_text(lxml_elem)
+                pos_xpath_text: str = get_element_text(
+                    lxml_elem, fix_mojibake=metadata.fix_mojibake
+                )
 
                 self.html_render_with_pos_xpath[
                     roi_idx][pos_xpath] = pos_xpath_html

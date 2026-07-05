@@ -37,7 +37,7 @@ logger = get_logger("tree_regions_system")
 #                               #
 #################################
 
-@attrs.define()
+@attrs.define(on_setattr=attrs.setters.NO_OP)
 class RegionOfInterest:
     pos_xpath_list: list[str] = attrs.field(
         validator=type_validator(),
@@ -63,7 +63,7 @@ class ReprLengthComparisionBy(StrEnum):
     HTML_LENGTH: str = "html_length"
 
 
-@attrs.define()
+@attrs.define(on_setattr=attrs.setters.NO_OP)
 class ROIMaker:
     node_xpath: str = attrs.field(
         validator=type_validator()
@@ -200,7 +200,7 @@ def order_regions_of_interest_by_pos_xpath(
     return sorted_regions
 
 
-@attrs.define()
+@attrs.define(on_setattr=attrs.setters.NO_OP)
 class TreeRegionsSystem:
     tree_representation: DOMTreeRepresentation = attrs.field(
         validator=type_validator()

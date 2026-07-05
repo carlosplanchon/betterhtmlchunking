@@ -55,12 +55,19 @@ def render_element_html(element) -> str:
     )
 
 
-def get_element_text(element) -> str:
-    """Extract normalised text from an lxml element (parsel-native)."""
-    return parsel_text.get_xpath_text(Selector(root=element), ".")
+def get_element_text(element, fix_mojibake: bool = True) -> str:
+    """Extract normalised text from an lxml element (parsel-native).
+
+    ``fix_mojibake`` (default True) runs the text through ``ftfy`` to repair
+    mis-encoded characters. Disabling it skips ftfy — noticeably faster in
+    TEXT_LENGTH mode, at the cost of not fixing mojibake.
+    """
+    return parsel_text.get_xpath_text(
+        Selector(root=element), ".", fix_mojibake=fix_mojibake
+    )
 
 
-@attrs.define()
+@attrs.define(on_setattr=attrs.setters.NO_OP)
 class NodeMetadata:
     idx: int = attrs.field(
         validator=type_validator(),
@@ -74,22 +81,32 @@ class NodeMetadata:
         validator=type_validator(),
         default=None
     )
+    fix_mojibake: bool = attrs.field(
+        validator=type_validator(),
+        default=True
+    )
 
     # Lazy, cached size metrics: computed on first access (and only for the
     # nodes the chunker/renderer actually touch), not eagerly for every node.
     @functools.cached_property
     def text_length(self) -> int:
-        return len(get_element_text(self.lxml_elem))
+        return len(
+            get_element_text(self.lxml_elem, fix_mojibake=self.fix_mojibake)
+        )
 
     @functools.cached_property
     def html_length(self) -> int:
         return len(render_element_html(self.lxml_elem))
 
 
-@attrs.define()
+@attrs.define(on_setattr=attrs.setters.NO_OP)
 class DOMTreeRepresentation:
     website_code: str = attrs.field(
         validator=type_validator()
+    )
+    fix_mojibake: bool = attrs.field(
+        validator=type_validator(),
+        default=True
     )
     root: Any = attrs.field(
         validator=type_validator(),
@@ -152,6 +169,7 @@ class DOMTreeRepresentation:
 
             node_metadata = NodeMetadata()
             node_metadata.lxml_elem = element
+            node_metadata.fix_mojibake = self.fix_mojibake
 
             self.xpaths_metadata[pos_xpath] = node_metadata
 

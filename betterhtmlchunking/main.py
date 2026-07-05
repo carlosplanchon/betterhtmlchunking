@@ -32,7 +32,7 @@ tag_list_to_filter_out: list[str] = [
 ]
 
 
-@attrs.define()
+@attrs.define(on_setattr=attrs.setters.NO_OP)
 class DomRepresentation:
     # Input
     MAX_NODE_REPR_LENGTH: int = attrs.field(
@@ -52,7 +52,11 @@ class DomRepresentation:
         default=None
     )
     html_unescape: bool = attrs.field(
-        validator=type_validator(), 
+        validator=type_validator(),
+        default=True
+    )
+    fix_mojibake: bool = attrs.field(
+        validator=type_validator(),
         default=True
     )
 
@@ -75,13 +79,14 @@ class DomRepresentation:
 
     def compute_tree_representation(self):
         self.tree_representation = DOMTreeRepresentation(
-            website_code=self.website_code
+            website_code=self.website_code,
+            fix_mojibake=self.fix_mojibake,
         )
+        # remove_unwanted_tags prunes the lxml tree and recomputes once.
         self.tree_representation = remove_unwanted_tags(
             tree_representation=self.tree_representation,
             tag_list_to_filter_out=self.tag_list_to_filter_out,
         )
-        self.tree_representation.recompute_representation()
 
     def compute_tree_regions_system(self):
         self.tree_regions_system = TreeRegionsSystem(

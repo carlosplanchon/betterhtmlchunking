@@ -284,3 +284,45 @@ class TestDomRepresentation:
         regions = dom.tree_regions_system.regions_of_interest_list
         assert regions is not None
         assert isinstance(regions, list)
+
+
+class TestFixMojibake:
+    """Tests for the fix_mojibake option (ftfy text repair)."""
+
+    # "cafÃ©" / "Ã¼ber": UTF-8 "café"/"über" mis-decoded as latin-1.
+    MOJIBAKE_HTML = (
+        "<html><body><p>cafÃ© Ã¼ber</p></body></html>"
+    )
+
+    def test_fix_mojibake_on_by_default_repairs_text(self):
+        dom = DomRepresentation(
+            MAX_NODE_REPR_LENGTH=1000,
+            website_code=self.MOJIBAKE_HTML,
+            repr_length_compared_by=ReprLengthComparisionBy.TEXT_LENGTH,
+        )
+        dom.start()
+        text = "\n".join(dom.render_system.text_render_roi.values())
+        assert "café über" in text      # "café über" repaired
+        assert "cafÃ©" not in text      # mojibake gone
+
+    def test_fix_mojibake_off_keeps_raw_text(self):
+        dom = DomRepresentation(
+            MAX_NODE_REPR_LENGTH=1000,
+            website_code=self.MOJIBAKE_HTML,
+            repr_length_compared_by=ReprLengthComparisionBy.TEXT_LENGTH,
+            fix_mojibake=False,
+        )
+        dom.start()
+        text = "\n".join(dom.render_system.text_render_roi.values())
+        assert "cafÃ©" in text          # mojibake preserved
+
+    def test_fix_mojibake_default_matches_previous_behavior(self):
+        """Default (fix on) must match a no-mojibake baseline unchanged."""
+        html = "<html><body><p>clean text</p></body></html>"
+        dom = DomRepresentation(
+            MAX_NODE_REPR_LENGTH=1000,
+            website_code=html,
+            repr_length_compared_by=ReprLengthComparisionBy.TEXT_LENGTH,
+        )
+        dom.start()
+        assert "clean text" in "\n".join(dom.render_system.text_render_roi.values())

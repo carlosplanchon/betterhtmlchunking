@@ -69,6 +69,11 @@ def chunk(
         "-f",
         help="Output format: 'json' for structured JSON output",
     ),
+    fix_mojibake: bool = typer.Option(
+        True,
+        "--fix-mojibake/--no-fix-mojibake",
+        help="Repair mis-encoded text with ftfy (default: on). Off is faster.",
+    ),
 ):
     """Read HTML from stdin and output the selected chunk as HTML."""
 
@@ -91,6 +96,7 @@ def chunk(
         MAX_NODE_REPR_LENGTH=max_length,
         website_code=html_input,
         repr_length_compared_by=compare,
+        fix_mojibake=fix_mojibake,
     )
     dom.start(verbose=verbose, maximal_verbose=maximal_verbose)
 
