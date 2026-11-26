@@ -161,7 +161,7 @@ for node in tree.all_nodes():
 
 2. **Region Detection**  
    - Uses **Breadth First Search (BFS)** to traverse the DOM tree in a level-order fashion, ensuring that each node is processed systematically.
-   - Combines nodes until the specified size limit is reached.
+   - Combines nodes until the specified size limit is reached. No chunk goes over the limit (the `\n` that joins its pieces included), except a single leaf element or run of text that is larger than the limit on its own and cannot be split without cutting text.
    - Text placed directly inside an element (around or between its children) is a unit of its own, so splitting an element never drops text. Regions list their pieces by positional XPath; text pieces use the standard text-node form, e.g. `/html/body/p/text()[2]`.
    - Preserves parent-child relationships to maintain contextual integrity.
 

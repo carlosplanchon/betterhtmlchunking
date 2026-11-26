@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+import pytest
+
+from betterhtmlchunking.main import DomRepresentation
 from betterhtmlchunking.tree_regions_system import ROIMaker
 from betterhtmlchunking.tree_regions_system import RegionOfInterest
 from betterhtmlchunking.tree_regions_system import TreeRegionsSystem
@@ -330,3 +333,67 @@ class TestTextNodeUnits:
             "/html/body/div/section/text()[2]",   # S1
             "/html/body/div/text()[2]",           # D1
         ]
+
+
+class TestRegionLimits:
+    """Regions stay under the limit and in document order (no final merge)."""
+
+    @staticmethod
+    def _chunks(html, max_length, mode=ReprLengthComparisionBy.HTML_LENGTH):
+        dom = DomRepresentation(
+            MAX_NODE_REPR_LENGTH=max_length,
+            website_code=html,
+            repr_length_compared_by=mode,
+            fix_mojibake=False,
+        )
+        dom.start()
+        rs = dom.render_system
+        html_chunks = [rs.html_render_roi[i] for i in sorted(rs.html_render_roi)]
+        text_chunks = [rs.text_render_roi[i] for i in sorted(rs.text_render_roi)]
+        return html_chunks, text_chunks
+
+    def test_leftover_region_is_not_merged_over_the_limit(self):
+        """Three spans that need two regions used to come out as one chunk."""
+        html = (
+            "<html><body><div>"
+            + "".join(f"<span>span {i} with filler text...</span> " for i in range(3))
+            + "</div></body></html>"
+        )
+        html_chunks, _ = self._chunks(html, 100)
+        assert len(html_chunks) == 2
+        assert all(len(chunk) <= 100 for chunk in html_chunks)
+
+    def test_content_after_a_large_child_keeps_its_place(self):
+        """The leftover after a large child used to jump before it."""
+        html = (
+            "<html><body><div><p>alpha</p><p>beta</p>"
+            "<section><p>" + "middle " * 30 + "</p></section>"
+            "<p>omega</p></div></body></html>"
+        )
+        _, text_chunks = self._chunks(html, 100)
+        text = "\n".join(text_chunks)
+        positions = [text.index(word) for word in ("alpha", "beta", "middle", "omega")]
+        assert positions == sorted(positions)
+
+    @pytest.mark.parametrize("mode", list(ReprLengthComparisionBy))
+    def test_separators_count_towards_the_limit(self, mode):
+        """Many small pieces: the "\n" joining them is part of the chunk."""
+        # 60 pieces: over the limit in both modes (text: 60 x + 59 "\n").
+        html = "<html><body><div>" + "<b>x</b>" * 60 + "</div></body></html>"
+        html_chunks, text_chunks = self._chunks(html, 100, mode=mode)
+        chunks = html_chunks if mode == ReprLengthComparisionBy.HTML_LENGTH else text_chunks
+        assert len(chunks) > 1
+        assert all(len(chunk) <= 100 for chunk in chunks)
+
+    def test_wrapper_heavy_with_attributes_is_not_emitted_whole(self):
+        """The content fits, but the wrapper's own attributes do not."""
+        html = (
+            '<html><body><div><span data-meta="' + "m" * 500 + '">'
+            "<b>bold</b> tail text</span><p>after</p></div></body></html>"
+        )
+        html_chunks, text_chunks = self._chunks(html, 100)
+        assert all(len(chunk) <= 100 for chunk in html_chunks)
+        assert not any("data-meta" in chunk for chunk in html_chunks)
+        text = "\n".join(text_chunks)
+        for words in ("bold", "tail text", "after"):
+            assert words in text

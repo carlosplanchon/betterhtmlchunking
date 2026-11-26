@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from collections import Counter
 from html import escape, unescape
 
 import pytest
@@ -458,21 +457,18 @@ class TestSplitKeepsText:
         (ReprLengthComparisionBy.TEXT_LENGTH, 40),
     ])
     def test_every_text_line_lands_in_exactly_one_chunk(self, mode, max_length):
-        """The chunks hold the document's text: nothing lost or duplicated.
-
-        Compared as a multiset: the final merge of leftover regions (a known,
-        separate issue) can still reorder content.
-        """
+        """The chunks hold the document's text: nothing lost, duplicated or
+        reordered."""
         dom = self._run(self.MIXED_HTML, max_length, mode=mode)
-        chunk_lines = Counter(
+        chunk_lines = [
             line for line in self._all_text(dom).split("\n") if line
-        )
+        ]
         document_text = get_element_text(
             dom.tree_representation.root, fix_mojibake=False
         )
-        document_lines = Counter(
+        document_lines = [
             line for line in document_text.split("\n") if line
-        )
+        ]
         assert chunk_lines == document_lines
 
 

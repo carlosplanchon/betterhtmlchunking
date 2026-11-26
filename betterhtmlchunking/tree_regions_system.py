@@ -128,7 +128,9 @@ class ROIMaker:
         """Group children into regions that don't exceed max_node_repr_length.
 
         The units are the element children and the non-blank text directly
-        inside the node, so splitting the node never leaves text behind.
+        inside the node, so splitting the node never leaves text behind. A
+        region's length includes the "\\n" that joins its pieces in the
+        rendered chunk, so the chunk the caller gets stays under the limit.
         """
         if not self.children_tags:
             return
@@ -156,44 +158,54 @@ class ROIMaker:
                     self.children_to_enqueue.append(unit_xpath)
                 continue
 
+            # The pieces of a chunk are joined with "\n" when rendered.
+            separator = 1 if current_region.pos_xpath_list else 0
+
             # Check if adding this unit would exceed the limit
-            proposed_length = current_region.repr_length + unit_length
+            proposed_length = (
+                current_region.repr_length + separator + unit_length
+            )
 
             if proposed_length >= self.max_node_repr_length:
                 # Close current region
                 if current_region.pos_xpath_list:
                     self.regions_of_interest_list.append(current_region)
                     current_region = RegionOfInterest()
+                separator = 0
 
             # Add unit to current region
             current_region.pos_xpath_list.append(unit_xpath)
-            current_region.repr_length += unit_length
+            current_region.repr_length += separator + unit_length
 
-        # Handle remaining content in current region
+        # The leftover content is a region of its own. Merging it into the
+        # previous region is never safe: that region was closed either
+        # because this content did not fit (the merge would go over the
+        # limit) or because a large child sits in between (it would reorder
+        # the content).
         if current_region.pos_xpath_list:
-            if self.regions_of_interest_list:
-                # Merge with last region
-                self.regions_of_interest_list[-1].pos_xpath_list += current_region.pos_xpath_list
-                self.regions_of_interest_list[-1].repr_length += current_region.repr_length
-            else:
-                # First and only region
-                self.regions_of_interest_list.append(current_region)
+            self.regions_of_interest_list.append(current_region)
 
     def _check_node_as_roi(self) -> None:
         """Check if the node itself should be treated as a single ROI."""
+        node = self.tree_representation.tree.get_node(nid=self.node_xpath)
         node_is_roi = False
 
         # Node is ROI if it has no children
         if not self.children_tags:
             node_is_roi = True
-        # Node is ROI if all its content fits in a single region
+        # Node is ROI if all its content fits in a single region, unless the
+        # node's own markup (its tags and attributes) pushes the whole node
+        # over the limit: then that region, the content without the wrapper,
+        # is kept instead.
         elif len(self.regions_of_interest_list) == 1:
             roi = self.regions_of_interest_list[0]
             if len(roi.pos_xpath_list) == len(self.content_units):
-                node_is_roi = True
+                node_is_roi = (
+                    self.get_node_repr_length(node=node)
+                    < self.max_node_repr_length
+                )
 
         if node_is_roi:
-            node = self.tree_representation.tree.get_node(nid=self.node_xpath)
             node_repr_length = self.get_node_repr_length(node=node)
 
             # Create a single ROI for the entire node
