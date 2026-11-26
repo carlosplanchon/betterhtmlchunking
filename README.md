@@ -136,7 +136,7 @@ Second paragraph...
 - `repr_length_compared_by`: Length calculation method:
   - ReprLengthComparisionBy.HTML_LENGTH: HTML source length
   - ReprLengthComparisionBy.TEXT_LENGTH: Rendered text length
-- `website_code`: Input HTML content
+- `website_code`: Input HTML content, as an already decoded `str`. Text that contains lone surrogates (for example, bytes decoded with `errors="surrogateescape"`) raises `ValueError`, because lxml would silently drop everything after the first one.
 
 ### Advanced Features
 ```python

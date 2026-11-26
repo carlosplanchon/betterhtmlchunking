@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import pytest
+
 from betterhtmlchunking.main import DomRepresentation
 from betterhtmlchunking.tree_regions_system import ReprLengthComparisionBy
 
@@ -326,3 +328,31 @@ class TestFixMojibake:
         )
         dom.start()
         assert "clean text" in "\n".join(dom.render_system.text_render_roi.values())
+
+
+class TestLoneSurrogates:
+    """DomRepresentation rejects text that lxml would silently truncate."""
+
+    def test_rejected_at_construction(self):
+        """A lone surrogate fails fast, before any processing."""
+        with pytest.raises(ValueError, match="lone surrogate"):
+            DomRepresentation(
+                MAX_NODE_REPR_LENGTH=1000,
+                website_code="<p>caf\udce9 cr\udce8me</p><p>second paragraph</p>",
+                repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH,
+            )
+
+    def test_escaped_surrogate_references_are_accepted(self):
+        """&#xD800; is plain text: html.unescape maps it to U+FFFD, no loss."""
+        dom = DomRepresentation(
+            MAX_NODE_REPR_LENGTH=1000,
+            website_code=(
+                "<html><body><p>before &#xD800; after</p>"
+                "<p>second paragraph</p></body></html>"
+            ),
+            repr_length_compared_by=ReprLengthComparisionBy.TEXT_LENGTH,
+        )
+        dom.start()
+        text = "\n".join(dom.render_system.text_render_roi.values())
+        assert "after" in text
+        assert "second paragraph" in text
