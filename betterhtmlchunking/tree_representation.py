@@ -13,6 +13,7 @@ import treelib
 
 import functools
 import html
+import re
 
 from typing import Any, Optional
 
@@ -33,13 +34,56 @@ def get_xpath_depth(xpath: str) -> int:
     return xpath.count("/")
 
 
+@functools.lru_cache(maxsize=32)
+def _parse_filter(entries: tuple[str, ...]) -> tuple[frozenset, frozenset, tuple]:
+    """Split filter entries into single steps (with/without index) and paths."""
+    names: set[str] = set()   # "/p": compared with the tag name of each step
+    exact: set[str] = set()   # "/div[2]": compared with the whole step
+    paths: list[tuple[str, ...]] = []  # "/body/aside": consecutive steps
+    for entry in entries:
+        entry_steps = tuple(step for step in entry.split("/") if step)
+        if len(entry_steps) == 1:
+            (exact if "[" in entry_steps[0] else names).add(entry_steps[0])
+        elif entry_steps:
+            paths.append(entry_steps)
+    return frozenset(names), frozenset(exact), tuple(paths)
+
+
+def _step_matches(step: str, tag_name: str, entry_step: str) -> bool:
+    return step == entry_step if "[" in entry_step else tag_name == entry_step
+
+
+_STEP_INDEX = re.compile(r"\[\d+\]")
+
+
 def wanted_xpath(
     xpath: str,
     tag_list_to_filter_out: list[str]
         ) -> bool:
-    """Check if an xpath should be kept based on the filter list."""
-    # Kept unless any of the unwanted tags appears in the xpath.
-    return not any(tag in xpath for tag in tag_list_to_filter_out)
+    """Check if an xpath should be kept based on the filter list.
+
+    Each entry is one or more xpath steps ("/head", "/body/aside") and it
+    matches whole steps of ``xpath``, at any depth: "/p" matches "p" and
+    "p[3]" but not "pre", and "/b" does not match "body". A step without an
+    index matches any position; "/div[2]" matches only that one.
+    """
+    names, exact, paths = _parse_filter(tuple(tag_list_to_filter_out))
+    if names and not names.isdisjoint(_STEP_INDEX.sub("", xpath).split("/")):
+        return False
+    if not (exact or paths):
+        return True
+    steps = xpath.split("/")[1:]
+    if exact and not exact.isdisjoint(steps):
+        return False
+    tag_names = [step.partition("[")[0] for step in steps]
+    for path in paths:
+        for start in range(len(steps) - len(path) + 1):
+            if all(
+                _step_matches(steps[start + i], tag_names[start + i], entry_step)
+                for i, entry_step in enumerate(path)
+            ):
+                return False
+    return True
 
 
 def get_children_tags(node):
@@ -288,14 +332,23 @@ class DOMTreeRepresentation:
         if not self.tag_list_to_filter_out:
             return
 
-        roottree = self.root.getroottree()
-        to_remove = [
-            element for element in self.root.iter()
-            if isinstance(element.tag, str)
-            and not wanted_xpath(
-                roottree.getpath(element), self.tag_list_to_filter_out
-            )
-        ]
+        names, exact, paths = _parse_filter(tuple(self.tag_list_to_filter_out))
+        if exact or paths:
+            roottree = self.root.getroottree()
+            to_remove = [
+                element for element in self.root.iter()
+                if isinstance(element.tag, str)
+                and not wanted_xpath(
+                    roottree.getpath(element), self.tag_list_to_filter_out
+                )
+            ]
+        else:
+            # Only plain tag names: no need for each element's xpath, since
+            # removing an element takes its descendants with it.
+            to_remove = [
+                element for element in self.root.iter()
+                if isinstance(element.tag, str) and element.tag in names
+            ]
 
         for element in to_remove:
             if element.getparent() is not None:
@@ -444,9 +497,11 @@ class DOMTreeRepresentation:
         # Text node positions inside the parent may have shifted.
         self.text_nodes_metadata = {}
 
+        # The node and its descendants, compared on whole steps: deleting
+        # "/html/body/p" must not take "/html/body/pre" with it.
         keys_to_remove: list[str] = [
             xpath for xpath in self.pos_xpaths_list
-            if xpath.startswith(pos_xpath)
+            if xpath == pos_xpath or xpath.startswith(pos_xpath + "/")
         ]
 
         logger.debug(f"Removing {len(keys_to_remove)} child nodes")
