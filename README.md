@@ -137,6 +137,7 @@ Second paragraph...
   - ReprLengthComparisionBy.HTML_LENGTH: HTML source length
   - ReprLengthComparisionBy.TEXT_LENGTH: Rendered text length
 - `website_code`: Input HTML content, as an already decoded `str`. Text that contains lone surrogates (for example, bytes decoded with `errors="surrogateescape"`) raises `ValueError`, because lxml would silently drop everything after the first one.
+- `html_unescape`: Whether to HTML-unescape `website_code` before parsing. With `None` (the default) this happens only when the input looks like an escaped document: no real tags, but escaped ones such as `&lt;p&gt;` (for example, HTML stored inside JSON). `True` always unescapes and `False` never does. Unescaping real HTML would turn its escaped text, such as code samples and attribute values, into markup.
 
 ### Advanced Features
 ```python
@@ -203,6 +204,14 @@ cat legacy.html | betterhtmlchunking --encoding latin-1 --max-length 32768
 ```
 
 Input that is not valid in the chosen encoding is rejected with an error (exit code 1) instead of being processed partially.
+
+### Escaped Input
+
+HTML that arrives escaped (`&lt;p&gt;Hello&lt;/p&gt;`, as when it is stored inside JSON) is unescaped automatically, as long as it has no real tags. Use `--html-unescape` or `--no-html-unescape` to force either behavior:
+
+```bash
+cat escaped.txt | betterhtmlchunking --html-unescape --max-length 32768
+```
 
 ### List All Chunks
 

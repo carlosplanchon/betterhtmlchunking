@@ -5,6 +5,7 @@ import json
 import typer
 import logging
 from pathlib import Path
+from typing import Optional
 from .main import DomRepresentation, ReprLengthComparisionBy
 from .logging_config import setup_root_logger, set_log_level, get_logger
 
@@ -97,6 +98,13 @@ def chunk(
         help="Encoding of the HTML read from stdin (default: utf-8). "
         "Input that is not valid in this encoding is rejected.",
     ),
+    html_unescape: Optional[bool] = typer.Option(
+        None,
+        "--html-unescape/--no-html-unescape",
+        help="Force or disable unescaping the input before parsing "
+        "(&lt;p&gt; into <p>). Default: only when the input has no real tags "
+        "but has escaped ones, as with HTML stored inside JSON.",
+    ),
 ):
     """Read HTML from stdin and output the selected chunk as HTML."""
 
@@ -134,6 +142,7 @@ def chunk(
         website_code=html_input,
         repr_length_compared_by=compare,
         fix_mojibake=fix_mojibake,
+        html_unescape=html_unescape,
     )
     dom.start(verbose=verbose, maximal_verbose=maximal_verbose)
 

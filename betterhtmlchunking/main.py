@@ -3,6 +3,7 @@
 import attrs
 import html
 import logging
+import re
 from typing import Optional
 
 from attrs_strict import type_validator
@@ -33,6 +34,25 @@ tag_list_to_filter_out: list[str] = [
     "/style",
 ]
 
+# The start of a real tag ("<p", "</p", "<!DOCTYPE", "<?xml"), and the same
+# thing escaped.
+_RAW_TAG = re.compile(r"<[A-Za-z!/?]")
+_ESCAPED_TAG = re.compile(r"&lt;[A-Za-z!/?]", re.IGNORECASE)
+
+
+def looks_html_escaped(website_code: str) -> bool:
+    """Whether the input is an escaped HTML document rather than HTML.
+
+    That is: not a single real tag, but escaped ones (``&lt;p&gt;...``), as
+    when a page is stored inside JSON. Real HTML always has tags, and its
+    escaped text (code samples, attribute values) must stay escaped:
+    unescaping it would turn that text into markup.
+    """
+    return (
+        _RAW_TAG.search(website_code) is None
+        and _ESCAPED_TAG.search(website_code) is not None
+    )
+
 
 @attrs.define(on_setattr=attrs.setters.NO_OP)
 class DomRepresentation:
@@ -53,9 +73,11 @@ class DomRepresentation:
         validator=type_validator(), 
         default=None
     )
-    html_unescape: bool = attrs.field(
+    # None (default): unescape only when looks_html_escaped(website_code).
+    # True / False: always / never unescape.
+    html_unescape: Optional[bool] = attrs.field(
         validator=type_validator(),
-        default=True
+        default=None
     )
     fix_mojibake: bool = attrs.field(
         validator=type_validator(),
@@ -76,7 +98,13 @@ class DomRepresentation:
     def __attrs_post_init__(self):
         if self.tag_list_to_filter_out is None:
             self.tag_list_to_filter_out = tag_list_to_filter_out
-        if self.html_unescape:
+        if self.html_unescape is None:
+            unescape = looks_html_escaped(self.website_code)
+            if unescape:
+                logger.info("Input looks like escaped HTML: unescaping it")
+        else:
+            unescape = self.html_unescape
+        if unescape:
             self.website_code = html.unescape(self.website_code)
 
     def compute_tree_representation(self):

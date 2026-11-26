@@ -2,6 +2,7 @@
 
 import io
 import json
+from html import escape as html_escape
 import sys
 import pytest
 from pathlib import Path
@@ -568,3 +569,37 @@ class TestCLIEncoding:
         """Test that read_stdin still works when stdin is a text-only stream."""
         monkeypatch.setattr(sys, "stdin", io.StringIO(MINIMAL_HTML))
         assert read_stdin("utf-8") == MINIMAL_HTML
+
+
+class TestCLIHtmlUnescape:
+    """--html-unescape / --no-html-unescape, and the automatic default."""
+
+    ESCAPED = html_escape(
+        "<html><body><h1>Title</h1><p>Body text</p></body></html>"
+    )
+
+    def test_escaped_input_is_unescaped_by_default(self):
+        result = runner.invoke(app, ["--max-length", "1000"], input=self.ESCAPED)
+        assert result.exit_code == 0
+        assert "<h1>Title</h1>" in result.stdout
+
+    def test_no_html_unescape_keeps_it_as_text(self):
+        result = runner.invoke(
+            app, ["--max-length", "1000", "--no-html-unescape"],
+            input=self.ESCAPED,
+        )
+        assert result.exit_code == 0
+        assert "<h1>" not in result.stdout
+        assert "&lt;h1&gt;" in result.stdout
+
+    def test_html_unescape_forces_it_on_real_html(self):
+        html_input = (
+            "<html><body><p>Use &lt;b&gt;bold&lt;/b&gt; here</p></body></html>"
+        )
+        default = runner.invoke(app, ["--max-length", "1000"], input=html_input)
+        forced = runner.invoke(
+            app, ["--max-length", "1000", "--html-unescape"], input=html_input
+        )
+        assert default.exit_code == 0 and forced.exit_code == 0
+        assert "&lt;b&gt;bold&lt;/b&gt;" in default.stdout
+        assert "<b>bold</b>" in forced.stdout

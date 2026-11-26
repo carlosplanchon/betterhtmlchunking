@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
 from collections import Counter
+from html import escape, unescape
 
 import pytest
 
-from betterhtmlchunking.main import DomRepresentation
+from betterhtmlchunking.main import DomRepresentation, looks_html_escaped
 from betterhtmlchunking.tree_regions_system import ReprLengthComparisionBy
 from betterhtmlchunking.tree_representation import (
     get_element_text,
@@ -97,7 +98,7 @@ class TestDomRepresentation:
         assert dom.render_system is not None
 
     def test_html_unescape_enabled(self):
-        """Test that HTML unescaping is applied when enabled."""
+        """html_unescape=True unescapes the input even when it is real HTML."""
         html = "<html><body><p>&lt;Hello&gt;</p></body></html>"
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
@@ -106,8 +107,7 @@ class TestDomRepresentation:
             html_unescape=True
         )
 
-        # HTML should be unescaped
-        assert "<Hello>" in dom.website_code or "&lt;" in html
+        assert dom.website_code == unescape(html)
 
     def test_html_unescape_disabled(self):
         """Test that HTML unescaping can be disabled."""
@@ -474,3 +474,72 @@ class TestSplitKeepsText:
             line for line in document_text.split("\n") if line
         )
         assert chunk_lines == document_lines
+
+
+class TestHtmlUnescape:
+    """html_unescape=None (the default) only unescapes escaped documents."""
+
+    @staticmethod
+    def _dom(website_code, **kwargs):
+        dom = DomRepresentation(
+            MAX_NODE_REPR_LENGTH=1000,
+            website_code=website_code,
+            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH,
+            **kwargs,
+        )
+        dom.start()
+        return dom
+
+    @staticmethod
+    def _text(dom):
+        return "\n".join(dom.render_system.text_render_roi.values())
+
+    def test_default_keeps_quotes_inside_attributes(self):
+        dom = self._dom(
+            '<html><body><p><a href="https://example.com/x" '
+            'title="say &quot;hi&quot;">link</a> after</p></body></html>'
+        )
+        link = dom.tree_representation.root.find(".//a")
+        assert link.get("title") == 'say "hi"'
+        assert link.get("href") == "https://example.com/x"
+
+    def test_default_keeps_escaped_markup_as_text(self):
+        dom = self._dom(
+            "<html><body><p>Use &lt;script&gt; tags carefully.</p>"
+            "<p>Second paragraph.</p></body></html>"
+        )
+        text = self._text(dom)
+        assert "Use <script> tags carefully." in text
+        assert "Second paragraph." in text
+
+    def test_default_keeps_code_samples(self):
+        dom = self._dom(
+            "<html><body><pre>if a &lt;b and c&gt; d:</pre></body></html>"
+        )
+        assert "if a <b and c> d:" in self._text(dom)
+        assert dom.tree_representation.root.find(".//pre/b") is None
+
+    def test_default_unescapes_an_escaped_document(self):
+        dom = self._dom(
+            escape("<html><body><p>Hello</p><p>World</p></body></html>")
+        )
+        assert "/html/body/p[2]" in dom.tree_representation.pos_xpaths_list
+        assert "World" in self._text(dom)
+
+    def test_false_never_unescapes(self):
+        escaped = escape("<html><body><p>Hello</p></body></html>")
+        dom = self._dom(escaped, html_unescape=False)
+        assert dom.website_code == escaped
+        assert "<p>Hello</p>" in self._text(dom)  # kept as literal text
+
+    @pytest.mark.parametrize("website_code,expected", [
+        ("<p>Use &lt;b&gt; for bold</p>", False),  # real HTML: leave it alone
+        ("&lt;p&gt;Hello&lt;/p&gt;", True),         # an escaped document
+        ("&lt;!DOCTYPE html&gt;&lt;html&gt;", True),
+        ("&LT;P&GT;upper case", True),
+        ("Fish &amp; Chips", False),                 # no escaped tag
+        ("5 &lt; 6", False),                         # "&lt;" then a space
+        ("", False),
+    ])
+    def test_looks_html_escaped(self, website_code, expected):
+        assert looks_html_escaped(website_code) is expected
