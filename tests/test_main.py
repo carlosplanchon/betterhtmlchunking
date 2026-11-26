@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 
+from collections import Counter
+
 import pytest
 
 from betterhtmlchunking.main import DomRepresentation
 from betterhtmlchunking.tree_regions_system import ReprLengthComparisionBy
+from betterhtmlchunking.tree_representation import (
+    get_element_text,
+    is_text_node_xpath,
+)
 
 
 class TestDomRepresentation:
@@ -356,3 +362,115 @@ class TestLoneSurrogates:
         text = "\n".join(dom.render_system.text_render_roi.values())
         assert "after" in text
         assert "second paragraph" in text
+
+
+class TestSplitKeepsText:
+    """Splitting an element into regions keeps the text directly inside it."""
+
+    INTRO_HTML = (
+        "<html><body><div>INTRO text. "
+        + "".join(
+            f"<span>span number {i} xxxxxxxxx</span> TAIL{i} " for i in range(6)
+        )
+        + "</div></body></html>"
+    )
+
+    # Inline elements, comments, <br>, a list and a <pre>: plenty of text
+    # nodes directly inside elements that a small limit forces to split.
+    MIXED_HTML = (
+        "<html><body>"
+        "<div>Lead text <a href='#'>link one</a>, middle <!-- c --> after "
+        "comment <b>bold <i>nested italic</i> end of bold</b> tail of bold."
+        "<p>Paragraph <em>with emphasis</em> and more.</p>"
+        "Loose text after the paragraph.<br>Line after br<br>Last line"
+        "<ul><li>One <code>x</code> two</li><li>Three</li></ul> after list"
+        "</div>"
+        "<pre>  indented <span>code</span>\n    more code</pre>"
+        "</body></html>"
+    )
+
+    @staticmethod
+    def _run(html, max_length, mode=ReprLengthComparisionBy.HTML_LENGTH):
+        dom = DomRepresentation(
+            MAX_NODE_REPR_LENGTH=max_length,
+            website_code=html,
+            repr_length_compared_by=mode,
+            fix_mojibake=False,
+        )
+        dom.start()
+        return dom
+
+    @staticmethod
+    def _all_text(dom):
+        return "\n".join(dom.render_system.text_render_roi.values())
+
+    def test_parent_text_and_tails_are_kept_in_order(self):
+        dom = self._run(self.INTRO_HTML, 100)
+        assert len(dom.render_system.html_render_roi) > 1  # it was split
+        text = self._all_text(dom)
+        html = "\n".join(dom.render_system.html_render_roi.values())
+        words = ["INTRO"] + [f"TAIL{i}" for i in range(6)]
+        for word in words:
+            assert word in text
+            assert word in html
+        positions = [text.index(word) for word in words]
+        assert positions == sorted(positions)
+
+    def test_text_length_mode_keeps_text(self):
+        dom = self._run(
+            self.INTRO_HTML, 30, mode=ReprLengthComparisionBy.TEXT_LENGTH
+        )
+        text = self._all_text(dom)
+        for word in ["INTRO"] + [f"TAIL{i}" for i in range(6)]:
+            assert word in text
+
+    def test_br_separated_lines_are_kept(self):
+        html = (
+            "<html><body><div>"
+            + "<br>".join(f"line {i} with some words" for i in range(600))
+            + "</div></body></html>"
+        )
+        dom = self._run(html, 1000)
+        assert len(dom.render_system.html_render_roi) > 1
+        text = self._all_text(dom)
+        assert all(f"line {i} with some words" in text for i in range(600))
+
+    def test_split_pre_keeps_whitespace(self):
+        html = (
+            "<html><body><pre>"
+            + "".join(f"  File <span>f{i}.py</span>, line {i}\n" for i in range(20))
+            + "</pre></body></html>"
+        )
+        dom = self._run(html, 100)
+        units = [
+            xpath
+            for roi in dom.tree_regions_system.sorted_roi_by_pos_xpath.values()
+            for xpath in roi.pos_xpath_list
+        ]
+        assert any(is_text_node_xpath(xpath) for xpath in units)  # was split
+        assert "  File " in self._all_text(dom)
+
+    @pytest.mark.parametrize("mode,max_length", [
+        (ReprLengthComparisionBy.HTML_LENGTH, 20),
+        (ReprLengthComparisionBy.HTML_LENGTH, 60),
+        (ReprLengthComparisionBy.HTML_LENGTH, 200),
+        (ReprLengthComparisionBy.TEXT_LENGTH, 10),
+        (ReprLengthComparisionBy.TEXT_LENGTH, 40),
+    ])
+    def test_every_text_line_lands_in_exactly_one_chunk(self, mode, max_length):
+        """The chunks hold the document's text: nothing lost or duplicated.
+
+        Compared as a multiset: the final merge of leftover regions (a known,
+        separate issue) can still reorder content.
+        """
+        dom = self._run(self.MIXED_HTML, max_length, mode=mode)
+        chunk_lines = Counter(
+            line for line in self._all_text(dom).split("\n") if line
+        )
+        document_text = get_element_text(
+            dom.tree_representation.root, fix_mojibake=False
+        )
+        document_lines = Counter(
+            line for line in document_text.split("\n") if line
+        )
+        assert chunk_lines == document_lines

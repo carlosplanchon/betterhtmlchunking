@@ -22,6 +22,8 @@ def remove_unwanted_tags(
     Single pass: every unwanted element is detached from the lxml tree in one
     go, then the representation is recomputed once. This avoids deleting node
     by node and re-sorting the entire xpath list on each removal (O(K*N log N)).
+    ``drop_tree()`` keeps each removed element's tail, which belongs to the
+    parent.
     """
     logger.debug(f"Filtering unwanted tags: {tag_list_to_filter_out}")
 
@@ -34,9 +36,8 @@ def remove_unwanted_tags(
             tag_list_to_filter_out=tag_list_to_filter_out
                 ) is False:
             element = tree_representation.xpaths_metadata[pos_xpath].lxml_elem
-            parent = element.getparent()
-            if parent is not None:
-                parent.remove(element)
+            if element.getparent() is not None:
+                element.drop_tree()
                 removed_count += 1
 
     # Rebuild the tree/xpaths once from the pruned lxml tree.

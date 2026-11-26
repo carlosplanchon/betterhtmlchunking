@@ -8,6 +8,7 @@ from betterhtmlchunking.tree_representation import (
     DOMTreeRepresentation,
     render_element_html,
     get_element_text,
+    is_text_node_xpath,
 )
 
 from betterhtmlchunking.tree_regions_system import\
@@ -78,6 +79,7 @@ class RenderSystem:
         logger.info(f"Rendering {total_rois} regions of interest")
 
         region_of_interest_idx: int = 0
+        tree_representation = self.tree_regions_system.tree_representation
 
         for roi_idx, roi in\
                 self.tree_regions_system.sorted_roi_by_pos_xpath.items():
@@ -89,19 +91,23 @@ class RenderSystem:
             for pos_xpath in roi.pos_xpath_list:
                 logger.debug(f"Processing xpath: {pos_xpath}")
 
-                metadata = \
-                    self.tree_regions_system.tree_representation.xpaths_metadata[
-                        pos_xpath
-                    ]
-                lxml_elem = metadata.lxml_elem
+                if is_text_node_xpath(pos_xpath):
+                    # Text directly inside a split element.
+                    text_node = \
+                        tree_representation.text_nodes_metadata[pos_xpath]
+                    pos_xpath_html = text_node.html
+                    pos_xpath_text = text_node.text
+                else:
+                    metadata = tree_representation.xpaths_metadata[pos_xpath]
+                    lxml_elem = metadata.lxml_elem
 
-                # HTML render:
-                pos_xpath_html: str = render_element_html(lxml_elem)
+                    # HTML render:
+                    pos_xpath_html = render_element_html(lxml_elem)
 
-                # Text render:
-                pos_xpath_text: str = get_element_text(
-                    lxml_elem, fix_mojibake=metadata.fix_mojibake
-                )
+                    # Text render:
+                    pos_xpath_text = get_element_text(
+                        lxml_elem, fix_mojibake=metadata.fix_mojibake
+                    )
 
                 self.html_render_with_pos_xpath[
                     roi_idx][pos_xpath] = pos_xpath_html

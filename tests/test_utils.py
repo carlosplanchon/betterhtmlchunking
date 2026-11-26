@@ -3,6 +3,7 @@
 from betterhtmlchunking.utils import wanted_xpath
 from betterhtmlchunking.utils import remove_unwanted_tags
 from betterhtmlchunking.tree_representation import DOMTreeRepresentation
+from betterhtmlchunking.tree_representation import get_element_text
 
 
 class TestWantedXPath:
@@ -80,3 +81,13 @@ class TestRemoveUnwantedTags:
 
         xpath_strings = [node.identifier for node in filtered_tree.tree.all_nodes()]
         assert any("/div" in xpath for xpath in xpath_strings)
+
+    def test_remove_unwanted_tags_keeps_tails(self):
+        """The text after a removed element belongs to its parent: keep it."""
+        tree = DOMTreeRepresentation(
+            website_code="<html><body><p>Hello <script>x()</script> world</p></body></html>"
+        )
+        remove_unwanted_tags(tree, ["/script"])
+        text = get_element_text(tree.root)
+        assert "world" in text
+        assert "x()" not in text
