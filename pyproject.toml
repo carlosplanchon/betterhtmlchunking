@@ -10,7 +10,7 @@ name = "betterhtmlchunking"
 version = "0.13.3"
 description = "A Python library for intelligent HTML segmentation and ROI extraction. It builds a DOM tree from raw HTML and extracts content-rich regions for efficient web scraping and analysis."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
   { name = "Carlos A. Planchón", email = "carlosandresplanchonprestes@gmail.com" }
 ]
@@ -34,7 +34,6 @@ classifiers = [
   "Intended Audience :: Developers",
   "Topic :: Software Development :: Libraries",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -45,8 +44,7 @@ classifiers = [
 dev = [
   "pytest>=9.0.2",
   "pytest-cov>=7.0.0",
-  "ipython>=9.9.0; python_version >= '3.11'",
-  "ipython; python_version < '3.11'",
+  "ipython>=9.9.0",
   "prettyprinter>=0.18.0",
 ]
 
