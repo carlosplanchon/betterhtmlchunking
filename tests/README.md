@@ -58,5 +58,6 @@ The test suite covers:
   - `--all-chunks` for saving all chunks to files
   - `--text-only` for plain text output
   - `--format json` for structured JSON output
+  - `--encoding` for non-UTF-8 input, and rejection of input that does not decode
   - Verbosity levels and logging
   - Integration between CLI features

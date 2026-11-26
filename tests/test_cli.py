@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
+import io
 import json
+import sys
 import pytest
 from pathlib import Path
 from typer.testing import CliRunner
-from betterhtmlchunking.cli import app
+from betterhtmlchunking.cli import app, read_stdin
 
 runner = CliRunner()
 
@@ -511,3 +513,58 @@ class TestCLIIntegration:
         )
         assert result.exit_code == 0
         assert any(output_dir.glob("chunk_*.txt"))
+
+
+class TestCLIEncoding:
+    """Test how the bytes read from stdin are decoded (--encoding)."""
+
+    # Latin-1 bytes: the accented letters are not valid UTF-8 on their own.
+    LATIN1_HTML = (
+        "<html><body><p>café crème</p><p>naïve résumé</p>"
+        "<div><p>fourth paragraph</p></div></body></html>"
+    ).encode("latin-1")
+
+    def test_utf8_is_the_default(self):
+        """Test that UTF-8 input is decoded without passing --encoding."""
+        html = "<html><body><p>café crème</p></body></html>".encode("utf-8")
+        result = runner.invoke(
+            app, ["--max-length", "1000", "--text-only"], input=html
+        )
+        assert result.exit_code == 0
+        assert "café crème" in result.stdout
+
+    def test_invalid_input_is_rejected_not_truncated(self):
+        """Test that input that does not decode fails instead of losing content."""
+        result = runner.invoke(
+            app, ["--max-length", "1000"], input=self.LATIN1_HTML
+        )
+        assert result.exit_code == 1
+        assert "not valid utf-8" in result.stderr
+        assert "--encoding" in result.stderr
+        assert result.stdout == ""
+
+    def test_explicit_encoding_keeps_all_content(self):
+        """Test that --encoding decodes non-UTF-8 input without losing content."""
+        result = runner.invoke(
+            app,
+            ["--max-length", "1000", "--text-only", "--encoding", "latin-1"],
+            input=self.LATIN1_HTML,
+        )
+        assert result.exit_code == 0
+        for fragment in ("café crème", "naïve résumé", "fourth paragraph"):
+            assert fragment in result.stdout
+
+    def test_unsupported_encoding_is_rejected(self):
+        """Test that an unknown --encoding value fails with a clear error."""
+        result = runner.invoke(
+            app,
+            ["--max-length", "1000", "--encoding", "no-such-codec"],
+            input=MINIMAL_HTML,
+        )
+        assert result.exit_code == 1
+        assert "unsupported encoding 'no-such-codec'" in result.stderr
+
+    def test_text_stream_without_buffer(self, monkeypatch):
+        """Test that read_stdin still works when stdin is a text-only stream."""
+        monkeypatch.setattr(sys, "stdin", io.StringIO(MINIMAL_HTML))
+        assert read_stdin("utf-8") == MINIMAL_HTML
