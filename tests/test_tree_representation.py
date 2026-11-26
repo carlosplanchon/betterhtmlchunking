@@ -409,3 +409,56 @@ class TestRemovalKeepsTails:
         text = get_element_text(tree.root)
         assert "tail" in text
         assert "bold" not in text
+
+
+class TestWholeStepMatching:
+    """Filters and deletions never catch a tag whose name merely starts alike."""
+
+    def test_filter_b_keeps_body(self):
+        html = "<html><body><p>a <b>bold</b> word</p></body></html>"
+        tree = DOMTreeRepresentation(website_code=html, tag_list_to_filter_out=["/b"])
+        text = get_element_text(tree.root)
+        assert "word" in text          # <body> survives
+        assert "bold" not in text      # <b> is gone
+        assert "/html/body/p" in tree.pos_xpaths_list
+
+    def test_default_filter_keeps_custom_elements(self):
+        from betterhtmlchunking.main import tag_list_to_filter_out
+        html = (
+            "<html><body><p>Nice <g-emoji alias='tada'>🎉</g-emoji>!</p>"
+            "<svg><g><path/></g></svg></body></html>"
+        )
+        tree = DOMTreeRepresentation(
+            website_code=html, tag_list_to_filter_out=tag_list_to_filter_out
+        )
+        assert "/html/body/p/g-emoji" in tree.pos_xpaths_list
+        assert not any("svg" in xpath for xpath in tree.pos_xpaths_list)
+
+    def test_filter_with_index_and_with_several_steps(self):
+        html = (
+            "<html><body><div>one</div><div>two</div>"
+            "<aside>side</aside><main><aside>inner</aside></main></body></html>"
+        )
+        tree = DOMTreeRepresentation(
+            website_code=html, tag_list_to_filter_out=["/div[2]", "/body/aside"]
+        )
+        text = get_element_text(tree.root)
+        assert "one" in text and "inner" in text
+        assert "two" not in text and "side" not in text
+
+    def test_delete_node_keeps_similarly_named_siblings(self):
+        from betterhtmlchunking.render_system import RenderSystem
+        from betterhtmlchunking.tree_regions_system import TreeRegionsSystem
+        html = (
+            "<html><body><p>uno</p><pre>code <b>x</b></pre>"
+            "<blockquote>cita</blockquote></body></html>"
+        )
+        tree = DOMTreeRepresentation(website_code=html)
+        tree.delete_node("/html/body/p")
+        assert "/html/body/p" not in tree.xpaths_metadata
+        assert "/html/body/pre" in tree.xpaths_metadata
+        assert "/html/body/pre/b" in tree.xpaths_metadata
+        # Rendering used to fail with KeyError: '/html/body/pre'.
+        regions = TreeRegionsSystem(tree_representation=tree, max_node_repr_length=10)
+        render = RenderSystem(tree_regions_system=regions, tree_representation=tree)
+        assert "code" in "\n".join(render.text_render_roi.values())

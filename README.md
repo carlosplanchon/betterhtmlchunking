@@ -137,6 +137,7 @@ Second paragraph...
   - ReprLengthComparisionBy.HTML_LENGTH: HTML source length
   - ReprLengthComparisionBy.TEXT_LENGTH: Rendered text length
 - `website_code`: Input HTML content, as an already decoded `str`. Text that contains lone surrogates (for example, bytes decoded with `errors="surrogateescape"`) raises `ValueError`, because lxml would silently drop everything after the first one.
+- `tag_list_to_filter_out`: Elements to remove before chunking, as xpath steps such as `/head` or `/body/aside` (defaults to `tag_list_to_filter_out` from `betterhtmlchunking.main`). Each entry matches whole steps at any depth: `/p` removes `<p>` elements but not `<pre>`, and `/b` does not touch `<body>`. A step without an index matches any position; `/div[2]` matches only that one. A removed element takes its contents with it, but the text right after it is kept.
 - `html_unescape`: Whether to HTML-unescape `website_code` before parsing. With `None` (the default) this happens only when the input looks like an escaped document: no real tags, but escaped ones such as `&lt;p&gt;` (for example, HTML stored inside JSON). `True` always unescapes and `False` never does. Unescaping real HTML would turn its escaped text, such as code samples and attribute values, into markup.
 
 ### Advanced Features

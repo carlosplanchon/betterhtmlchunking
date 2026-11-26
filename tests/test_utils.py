@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import pytest
+
 from betterhtmlchunking.utils import wanted_xpath
 from betterhtmlchunking.utils import remove_unwanted_tags
 from betterhtmlchunking.tree_representation import DOMTreeRepresentation
@@ -32,6 +34,25 @@ class TestWantedXPath:
         xpath = "/html/body/div"
         tag_list = []
         assert wanted_xpath(xpath, tag_list) is True
+
+    @pytest.mark.parametrize("xpath,tag_list,expected", [
+        # Entries match whole steps, never a prefix of a longer tag name.
+        ("/html/body/header", ["/head"], True),
+        ("/html/body", ["/b"], True),
+        ("/html/body/pre", ["/p"], True),
+        ("/html/body/gallery-item", ["/g"], True),
+        # A step without an index matches any position.
+        ("/html/body/p[3]", ["/p"], False),
+        ("/html/body/svg/g/path", ["/svg"], False),
+        # A step with an index matches only that position.
+        ("/html/body/div[2]/p", ["/div[2]"], False),
+        ("/html/body/div[20]/p", ["/div[2]"], True),
+        # Several steps must appear one after the other.
+        ("/html/body/aside", ["/body/aside"], False),
+        ("/html/body/main/aside", ["/body/aside"], True),
+    ])
+    def test_wanted_xpath_matches_whole_steps(self, xpath, tag_list, expected):
+        assert wanted_xpath(xpath, tag_list) is expected
 
 
 class TestRemoveUnwantedTags:
