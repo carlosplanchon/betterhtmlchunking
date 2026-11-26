@@ -76,6 +76,27 @@ def get_element_text(element, fix_mojibake: bool = True) -> str:
     )
 
 
+def reject_lone_surrogates(instance, attribute, value: str) -> None:
+    """attrs validator: refuse text that lxml would silently truncate.
+
+    lxml stops parsing at the first lone surrogate (U+D800 to U+DFFF) and
+    drops the rest of the document without raising. These code points usually
+    come from bytes decoded with ``errors="surrogateescape"``, which is how
+    ``sys.stdin`` decodes by default since Python 3.15 (PEP 686). Encoding to
+    UTF-8 fails exactly on them, and is much faster than a regex scan.
+    """
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise ValueError(
+            f"{attribute.name} contains a lone surrogate "
+            f"(U+{ord(value[exc.start]):04X}) at index {exc.start}; lxml "
+            "would silently drop everything after it. This usually means the "
+            'bytes were decoded with errors="surrogateescape": decode them '
+            "with the document's real encoding instead."
+        ) from None
+
+
 @attrs.define(on_setattr=attrs.setters.NO_OP)
 class NodeMetadata:
     idx: int = attrs.field(
@@ -111,7 +132,7 @@ class NodeMetadata:
 @attrs.define(on_setattr=attrs.setters.NO_OP)
 class DOMTreeRepresentation:
     website_code: str = attrs.field(
-        validator=type_validator()
+        validator=[type_validator(), reject_lone_surrogates]
     )
     fix_mojibake: bool = attrs.field(
         validator=type_validator(),

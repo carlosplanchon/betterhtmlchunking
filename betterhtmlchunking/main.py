@@ -6,7 +6,10 @@ import logging
 from typing import Optional
 
 from attrs_strict import type_validator
-from betterhtmlchunking.tree_representation import DOMTreeRepresentation
+from betterhtmlchunking.tree_representation import (
+    DOMTreeRepresentation,
+    reject_lone_surrogates,
+)
 from betterhtmlchunking.tree_regions_system import (
     TreeRegionsSystem,
     ReprLengthComparisionBy,
@@ -38,7 +41,7 @@ class DomRepresentation:
         validator=type_validator()
     )
     website_code: str = attrs.field(
-        validator=type_validator(), 
+        validator=[type_validator(), reject_lone_surrogates],
         repr=False
     )
     repr_length_compared_by: ReprLengthComparisionBy = attrs.field(

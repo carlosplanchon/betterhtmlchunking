@@ -8,6 +8,7 @@ from betterhtmlchunking.tree_representation import (
 )
 
 import lxml.html
+import pytest
 
 
 def _element(html: str, tag: str):
@@ -316,3 +317,24 @@ class TestConstructorFiltering:
         html = "<html><head><title>T</title></head><body><div>x</div></body></html>"
         tree = DOMTreeRepresentation(website_code=html)
         assert any("/head" in x for x in tree.pos_xpaths_list)
+
+
+class TestLoneSurrogates:
+    """Lone surrogates are rejected: lxml would drop everything after them."""
+
+    # What b"<p>caf\xe9 cr\xe8me</p>..." becomes with errors="surrogateescape".
+    SURROGATE_HTML = "<p>caf\udce9 cr\udce8me</p><p>second paragraph</p>"
+
+    def test_lone_surrogate_is_rejected(self):
+        with pytest.raises(ValueError) as excinfo:
+            DOMTreeRepresentation(website_code=self.SURROGATE_HTML)
+        message = str(excinfo.value)
+        assert "website_code" in message
+        assert "lone surrogate (U+DCE9) at index 6" in message
+
+    def test_astral_characters_are_accepted(self):
+        """Characters outside the BMP (e.g. emoji) are not surrogates in a str."""
+        tree = DOMTreeRepresentation(
+            website_code="<html><body><p>hi \U0001F600 there</p></body></html>"
+        )
+        assert "\U0001F600" in render_element_html(tree.root)
