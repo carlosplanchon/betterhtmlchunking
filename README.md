@@ -41,6 +41,18 @@ pip install betterhtmlchunking
 
 ## Usage
 
+### Quick Start
+
+```python
+from betterhtmlchunking import chunk_html
+
+chunks = chunk_html(html_content, max_length=4096)  # by="text" measures the text instead
+for chunk in chunks:
+    print(chunk.index, len(chunk.html), chunk.text[:80])
+```
+
+Each `Chunk` is immutable and has `index`, `html`, `text` and `xpaths` (the positional XPaths of its pieces). `chunk_html` takes the same options as `DomRepresentation` as keyword arguments (`tag_list_to_filter_out`, `html_unescape`, `fix_mojibake`). For access to the DOM tree and the regions of interest, use `DomRepresentation` directly, as below.
+
 ### Basic Example
 
 ```python

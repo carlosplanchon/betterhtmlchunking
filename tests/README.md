@@ -38,6 +38,7 @@ pytest tests/ --cov=betterhtmlchunking --cov-report=html
 ## Test Structure
 
 - `test_main.py` - Tests for the main API (DomRepresentation)
+- `test_chunk_html.py` - Tests for the `chunk_html()` shortcut
 - `test_tree_representation.py` - Tests for DOM tree representation
 - `test_tree_regions_system.py` - Tests for ROI detection system
 - `test_utils.py` - Tests for utility functions
