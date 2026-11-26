@@ -193,6 +193,16 @@ cat input.html | betterhtmlchunking --max-length 32768 --chunk-index 0 > chunk.h
 
 By default the command reads from `stdin`, processes chunks up to a maximum length of 32,768 characters, and prints the HTML corresponding to chunk index `0` to `stdout`.
 
+### Input Encoding
+
+`stdin` is decoded as UTF-8 by default. For documents in another encoding, pass it with `--encoding`:
+
+```bash
+cat legacy.html | betterhtmlchunking --encoding latin-1 --max-length 32768
+```
+
+Input that is not valid in the chosen encoding is rejected with an error (exit code 1) instead of being processed partially.
+
 ### List All Chunks
 
 See how many chunks are created and their sizes without processing the full content:

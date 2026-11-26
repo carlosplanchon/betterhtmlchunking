@@ -14,6 +14,23 @@ app = typer.Typer(help="Chunk HTML documents from the command line")
 setup_root_logger(level=logging.WARNING)
 logger = get_logger("cli")
 
+
+def read_stdin(encoding: str) -> str:
+    """Read all of stdin and decode it strictly with ``encoding``.
+
+    stdin is read as bytes and decoded here so the result does not depend on
+    the Python version, the locale or the OS. Since Python 3.15 (PEP 686) the
+    text-mode ``sys.stdin`` decodes with ``surrogateescape``: bytes that are
+    not valid UTF-8 become lone surrogates, and lxml silently drops everything
+    after the first one. A strict decode raises ``UnicodeDecodeError`` instead.
+    """
+    binary_stdin = getattr(sys.stdin, "buffer", None)
+    if binary_stdin is None:
+        # stdin was replaced by a text-only stream (e.g. io.StringIO).
+        return sys.stdin.read()
+    return binary_stdin.read().decode(encoding)
+
+
 @app.command()
 def chunk(
     max_length: int = typer.Option(
@@ -74,6 +91,12 @@ def chunk(
         "--fix-mojibake/--no-fix-mojibake",
         help="Repair mis-encoded text with ftfy (default: on). Off is faster.",
     ),
+    encoding: str = typer.Option(
+        "utf-8",
+        "--encoding",
+        help="Encoding of the HTML read from stdin (default: utf-8). "
+        "Input that is not valid in this encoding is rejected.",
+    ),
 ):
     """Read HTML from stdin and output the selected chunk as HTML."""
 
@@ -85,7 +108,21 @@ def chunk(
     else:
         set_log_level(logging.WARNING)
 
-    html_input = sys.stdin.read()
+    try:
+        html_input = read_stdin(encoding)
+    except LookupError:
+        typer.echo(f"Error: unsupported encoding '{encoding}'", err=True)
+        raise typer.Exit(code=1)
+    except UnicodeDecodeError as exc:
+        typer.echo(
+            f"Error: stdin is not valid {encoding} "
+            f"({exc.reason} at byte {exc.start}). "
+            "Pass the document's encoding with --encoding, "
+            "e.g. --encoding latin-1",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
     compare = (
         ReprLengthComparisionBy.TEXT_LENGTH
         if by_text
