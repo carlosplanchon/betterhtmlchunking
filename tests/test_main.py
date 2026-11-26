@@ -5,7 +5,7 @@ from html import escape, unescape
 import pytest
 
 from betterhtmlchunking.main import DomRepresentation, looks_html_escaped
-from betterhtmlchunking.tree_regions_system import ReprLengthComparisionBy
+from betterhtmlchunking.tree_regions_system import ReprLengthComparisonBy
 from betterhtmlchunking.tree_representation import (
     get_element_text,
     is_text_node_xpath,
@@ -21,7 +21,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
         assert dom is not None
         assert dom.website_code == html
@@ -32,7 +32,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         dom.compute_tree_representation()
@@ -46,7 +46,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         dom.compute_tree_representation()
@@ -61,7 +61,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         dom.compute_tree_representation()
@@ -85,7 +85,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=150,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         dom.compute_tree_representation()
@@ -102,7 +102,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH,
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH,
             html_unescape=True
         )
 
@@ -114,7 +114,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH,
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH,
             html_unescape=False
         )
 
@@ -127,7 +127,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH,
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH,
             tag_list_to_filter_out=["/head"]
         )
 
@@ -142,7 +142,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         dom.compute_tree_representation()
@@ -158,7 +158,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.TEXT_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.TEXT_LENGTH
         )
 
         dom.compute_tree_representation()
@@ -172,7 +172,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         dom.compute_tree_representation()
@@ -186,7 +186,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=10,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         dom.compute_tree_representation()
@@ -201,7 +201,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=10000,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         dom.compute_tree_representation()
@@ -236,7 +236,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=200,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         dom.compute_tree_representation()
@@ -253,7 +253,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         dom.compute_tree_representation()
@@ -268,7 +268,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         # Should parse without crashing
@@ -281,7 +281,7 @@ class TestDomRepresentation:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=100,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         dom.compute_tree_representation()
@@ -305,7 +305,7 @@ class TestFixMojibake:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=1000,
             website_code=self.MOJIBAKE_HTML,
-            repr_length_compared_by=ReprLengthComparisionBy.TEXT_LENGTH,
+            repr_length_compared_by=ReprLengthComparisonBy.TEXT_LENGTH,
         )
         dom.start()
         text = "\n".join(dom.render_system.text_render_roi.values())
@@ -316,7 +316,7 @@ class TestFixMojibake:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=1000,
             website_code=self.MOJIBAKE_HTML,
-            repr_length_compared_by=ReprLengthComparisionBy.TEXT_LENGTH,
+            repr_length_compared_by=ReprLengthComparisonBy.TEXT_LENGTH,
             fix_mojibake=False,
         )
         dom.start()
@@ -329,7 +329,7 @@ class TestFixMojibake:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=1000,
             website_code=html,
-            repr_length_compared_by=ReprLengthComparisionBy.TEXT_LENGTH,
+            repr_length_compared_by=ReprLengthComparisonBy.TEXT_LENGTH,
         )
         dom.start()
         assert "clean text" in "\n".join(dom.render_system.text_render_roi.values())
@@ -344,7 +344,7 @@ class TestLoneSurrogates:
             DomRepresentation(
                 MAX_NODE_REPR_LENGTH=1000,
                 website_code="<p>caf\udce9 cr\udce8me</p><p>second paragraph</p>",
-                repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH,
+                repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH,
             )
 
     def test_escaped_surrogate_references_are_accepted(self):
@@ -355,7 +355,7 @@ class TestLoneSurrogates:
                 "<html><body><p>before &#xD800; after</p>"
                 "<p>second paragraph</p></body></html>"
             ),
-            repr_length_compared_by=ReprLengthComparisionBy.TEXT_LENGTH,
+            repr_length_compared_by=ReprLengthComparisonBy.TEXT_LENGTH,
         )
         dom.start()
         text = "\n".join(dom.render_system.text_render_roi.values())
@@ -389,7 +389,7 @@ class TestSplitKeepsText:
     )
 
     @staticmethod
-    def _run(html, max_length, mode=ReprLengthComparisionBy.HTML_LENGTH):
+    def _run(html, max_length, mode=ReprLengthComparisonBy.HTML_LENGTH):
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=max_length,
             website_code=html,
@@ -417,7 +417,7 @@ class TestSplitKeepsText:
 
     def test_text_length_mode_keeps_text(self):
         dom = self._run(
-            self.INTRO_HTML, 30, mode=ReprLengthComparisionBy.TEXT_LENGTH
+            self.INTRO_HTML, 30, mode=ReprLengthComparisonBy.TEXT_LENGTH
         )
         text = self._all_text(dom)
         for word in ["INTRO"] + [f"TAIL{i}" for i in range(6)]:
@@ -450,11 +450,11 @@ class TestSplitKeepsText:
         assert "  File " in self._all_text(dom)
 
     @pytest.mark.parametrize("mode,max_length", [
-        (ReprLengthComparisionBy.HTML_LENGTH, 20),
-        (ReprLengthComparisionBy.HTML_LENGTH, 60),
-        (ReprLengthComparisionBy.HTML_LENGTH, 200),
-        (ReprLengthComparisionBy.TEXT_LENGTH, 10),
-        (ReprLengthComparisionBy.TEXT_LENGTH, 40),
+        (ReprLengthComparisonBy.HTML_LENGTH, 20),
+        (ReprLengthComparisonBy.HTML_LENGTH, 60),
+        (ReprLengthComparisonBy.HTML_LENGTH, 200),
+        (ReprLengthComparisonBy.TEXT_LENGTH, 10),
+        (ReprLengthComparisonBy.TEXT_LENGTH, 40),
     ])
     def test_every_text_line_lands_in_exactly_one_chunk(self, mode, max_length):
         """The chunks hold the document's text: nothing lost, duplicated or
@@ -480,7 +480,7 @@ class TestHtmlUnescape:
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=1000,
             website_code=website_code,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH,
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH,
             **kwargs,
         )
         dom.start()

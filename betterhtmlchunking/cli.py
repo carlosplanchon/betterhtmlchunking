@@ -6,7 +6,7 @@ import typer
 import logging
 from pathlib import Path
 from typing import Optional
-from .main import DomRepresentation, ReprLengthComparisionBy
+from .main import DomRepresentation, ReprLengthComparisonBy
 from .logging_config import setup_root_logger, set_log_level, get_logger
 
 app = typer.Typer(help="Chunk HTML documents from the command line")
@@ -132,9 +132,9 @@ def chunk(
         raise typer.Exit(code=1)
 
     compare = (
-        ReprLengthComparisionBy.TEXT_LENGTH
+        ReprLengthComparisonBy.TEXT_LENGTH
         if by_text
-        else ReprLengthComparisionBy.HTML_LENGTH
+        else ReprLengthComparisonBy.HTML_LENGTH
     )
 
     dom = DomRepresentation(

@@ -6,7 +6,7 @@ from betterhtmlchunking.main import DomRepresentation
 from betterhtmlchunking.tree_regions_system import ROIMaker
 from betterhtmlchunking.tree_regions_system import RegionOfInterest
 from betterhtmlchunking.tree_regions_system import TreeRegionsSystem
-from betterhtmlchunking.tree_regions_system import ReprLengthComparisionBy
+from betterhtmlchunking.tree_regions_system import ReprLengthComparisonBy
 from betterhtmlchunking.tree_regions_system import\
     order_regions_of_interest_by_pos_xpath
 
@@ -48,7 +48,7 @@ class TestROIMaker:
             children_tags=[],
             tree_representation=tree,
             max_node_repr_length=100,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         # Node with no children should be treated as ROI itself
@@ -71,7 +71,7 @@ class TestROIMaker:
             children_tags=children,
             tree_representation=tree,
             max_node_repr_length=1000,  # Large enough to group all
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         # When all children fit in one region, parent node becomes the ROI
@@ -92,7 +92,7 @@ class TestROIMaker:
             children_tags=children,
             tree_representation=tree,
             max_node_repr_length=50,  # Small enough to split
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         # Should enqueue large children for deeper processing
@@ -111,7 +111,7 @@ class TestROIMaker:
             children_tags=children,
             tree_representation=tree,
             max_node_repr_length=100,
-            repr_length_compared_by=ReprLengthComparisionBy.TEXT_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.TEXT_LENGTH
         )
 
         assert len(roi_maker.regions_of_interest_list) >= 1
@@ -128,7 +128,7 @@ class TestTreeRegionsSystem:
         regions = TreeRegionsSystem(
             tree_representation=tree,
             max_node_repr_length=100,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         assert regions.regions_of_interest_list is not None
@@ -145,7 +145,7 @@ class TestTreeRegionsSystem:
             tree_representation=tree,
             max_node_repr_length=100,
             root_xpath=body_xpath,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         assert len(regions.regions_of_interest_list) >= 1
@@ -166,7 +166,7 @@ class TestTreeRegionsSystem:
         regions = TreeRegionsSystem(
             tree_representation=tree,
             max_node_repr_length=50,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         assert len(regions.regions_of_interest_list) >= 1
@@ -179,7 +179,7 @@ class TestTreeRegionsSystem:
         regions = TreeRegionsSystem(
             tree_representation=tree,
             max_node_repr_length=100,
-            repr_length_compared_by=ReprLengthComparisionBy.TEXT_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.TEXT_LENGTH
         )
 
         assert regions.regions_of_interest_list is not None
@@ -192,7 +192,7 @@ class TestTreeRegionsSystem:
         regions = TreeRegionsSystem(
             tree_representation=tree,
             max_node_repr_length=100,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         # Should handle empty tree gracefully
@@ -206,7 +206,7 @@ class TestTreeRegionsSystem:
         regions = TreeRegionsSystem(
             tree_representation=tree,
             max_node_repr_length=10,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         # Should still create at least one region
@@ -220,7 +220,7 @@ class TestTreeRegionsSystem:
         regions = TreeRegionsSystem(
             tree_representation=tree,
             max_node_repr_length=100000,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
 
         # Should group everything into one or few regions
@@ -287,7 +287,7 @@ class TestTextNodeUnits:
             children_tags=tree.get_children_tag_list(xpath=div_xpath),
             tree_representation=tree,
             max_node_repr_length=100,
-            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+            repr_length_compared_by=ReprLengthComparisonBy.HTML_LENGTH
         )
         text_xpath = "/html/body/div/text()[1]"
         assert text_xpath in roi_maker.content_units
@@ -339,7 +339,7 @@ class TestRegionLimits:
     """Regions stay under the limit and in document order (no final merge)."""
 
     @staticmethod
-    def _chunks(html, max_length, mode=ReprLengthComparisionBy.HTML_LENGTH):
+    def _chunks(html, max_length, mode=ReprLengthComparisonBy.HTML_LENGTH):
         dom = DomRepresentation(
             MAX_NODE_REPR_LENGTH=max_length,
             website_code=html,
@@ -375,13 +375,13 @@ class TestRegionLimits:
         positions = [text.index(word) for word in ("alpha", "beta", "middle", "omega")]
         assert positions == sorted(positions)
 
-    @pytest.mark.parametrize("mode", list(ReprLengthComparisionBy))
+    @pytest.mark.parametrize("mode", list(ReprLengthComparisonBy))
     def test_separators_count_towards_the_limit(self, mode):
         """Many small pieces: the "\n" joining them is part of the chunk."""
         # 60 pieces: over the limit in both modes (text: 60 x + 59 "\n").
         html = "<html><body><div>" + "<b>x</b>" * 60 + "</div></body></html>"
         html_chunks, text_chunks = self._chunks(html, 100, mode=mode)
-        chunks = html_chunks if mode == ReprLengthComparisionBy.HTML_LENGTH else text_chunks
+        chunks = html_chunks if mode == ReprLengthComparisonBy.HTML_LENGTH else text_chunks
         assert len(chunks) > 1
         assert all(len(chunk) <= 100 for chunk in chunks)
 

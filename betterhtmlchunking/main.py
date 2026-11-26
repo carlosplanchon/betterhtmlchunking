@@ -13,7 +13,7 @@ from betterhtmlchunking.tree_representation import (
 )
 from betterhtmlchunking.tree_regions_system import (
     TreeRegionsSystem,
-    ReprLengthComparisionBy,
+    ReprLengthComparisonBy,
 )
 from betterhtmlchunking.render_system import RenderSystem
 from betterhtmlchunking.logging_config import get_logger
@@ -64,7 +64,7 @@ class DomRepresentation:
         validator=[type_validator(), reject_lone_surrogates],
         repr=False
     )
-    repr_length_compared_by: ReprLengthComparisionBy = attrs.field(
+    repr_length_compared_by: ReprLengthComparisonBy = attrs.field(
         validator=type_validator()
     )
 
