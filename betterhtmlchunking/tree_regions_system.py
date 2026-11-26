@@ -10,8 +10,12 @@ import treelib
 
 from betterhtmlchunking.tree_representation import\
     DOMTreeRepresentation
-from betterhtmlchunking.tree_representation import\
-    get_xpath_depth
+from betterhtmlchunking.tree_representation import (
+    TextNodeMetadata,
+    get_xpath_depth,
+    is_text_node_xpath,
+    split_text_node_xpath,
+)
 from betterhtmlchunking.logging_config import get_logger
 
 from enum import StrEnum
@@ -80,10 +84,19 @@ class ROIMaker:
         validator=type_validator(),
         init=False
     )
+    # Element children plus the text directly inside the node, in order.
+    content_units: list[str] = attrs.field(
+        validator=type_validator(),
+        init=False
+    )
 
     def __attrs_post_init__(self) -> None:
         self.regions_of_interest_list: list[RegionOfInterest] = []
         self.children_to_enqueue: list[str] = []
+        self.content_units: list[str] = (
+            self.tree_representation.get_content_units(self.node_xpath)
+            if self.children_tags else []
+        )
 
         # Process children and group them into regions
         self._process_children()
@@ -99,29 +112,52 @@ class ROIMaker:
             case ReprLengthComparisionBy.HTML_LENGTH:
                 return node.data.html_length
 
+    def get_unit_repr_length(self, unit_xpath: str) -> int:
+        """Representation length of a content unit (element or text node)."""
+        if is_text_node_xpath(unit_xpath):
+            data = self.tree_representation.text_nodes_metadata[unit_xpath]
+        else:
+            data = self.tree_representation.tree.get_node(nid=unit_xpath).data
+        match self.repr_length_compared_by:
+            case ReprLengthComparisionBy.TEXT_LENGTH:
+                return data.text_length
+            case ReprLengthComparisionBy.HTML_LENGTH:
+                return data.html_length
+
     def _process_children(self) -> None:
-        """Group children into regions that don't exceed max_node_repr_length."""
+        """Group children into regions that don't exceed max_node_repr_length.
+
+        The units are the element children and the non-blank text directly
+        inside the node, so splitting the node never leaves text behind.
+        """
         if not self.children_tags:
             return
 
         current_region = RegionOfInterest()
 
-        for child_xpath in self.children_tags:
-            node = self.tree_representation.tree.get_node(nid=child_xpath)
-            node_length = self.get_node_repr_length(node=node)
+        for unit_xpath in self.content_units:
+            unit_length = self.get_unit_repr_length(unit_xpath)
 
-            # If node itself is too large, needs separate processing
-            if node_length >= self.max_node_repr_length:
+            # If the unit itself is too large, it gets its own treatment
+            if unit_length >= self.max_node_repr_length:
                 # Close current region if it has content
                 if current_region.pos_xpath_list:
                     self.regions_of_interest_list.append(current_region)
                     current_region = RegionOfInterest()
-                # Mark child for deeper processing
-                self.children_to_enqueue.append(child_xpath)
+                if is_text_node_xpath(unit_xpath):
+                    # A text node cannot be split further: it is a region
+                    # of its own.
+                    text_region = RegionOfInterest()
+                    text_region.pos_xpath_list.append(unit_xpath)
+                    text_region.repr_length = unit_length
+                    self.regions_of_interest_list.append(text_region)
+                else:
+                    # Mark child for deeper processing
+                    self.children_to_enqueue.append(unit_xpath)
                 continue
 
-            # Check if adding this node would exceed the limit
-            proposed_length = current_region.repr_length + node_length
+            # Check if adding this unit would exceed the limit
+            proposed_length = current_region.repr_length + unit_length
 
             if proposed_length >= self.max_node_repr_length:
                 # Close current region
@@ -129,9 +165,9 @@ class ROIMaker:
                     self.regions_of_interest_list.append(current_region)
                     current_region = RegionOfInterest()
 
-            # Add node to current region
-            current_region.pos_xpath_list.append(child_xpath)
-            current_region.repr_length += node_length
+            # Add unit to current region
+            current_region.pos_xpath_list.append(unit_xpath)
+            current_region.repr_length += unit_length
 
         # Handle remaining content in current region
         if current_region.pos_xpath_list:
@@ -150,10 +186,10 @@ class ROIMaker:
         # Node is ROI if it has no children
         if not self.children_tags:
             node_is_roi = True
-        # Node is ROI if all children fit in a single region
+        # Node is ROI if all its content fits in a single region
         elif len(self.regions_of_interest_list) == 1:
             roi = self.regions_of_interest_list[0]
-            if len(roi.pos_xpath_list) == len(self.children_tags):
+            if len(roi.pos_xpath_list) == len(self.content_units):
                 node_is_roi = True
 
         if node_is_roi:
@@ -171,24 +207,35 @@ class ROIMaker:
 
 def order_regions_of_interest_by_pos_xpath(
     region_of_interest_list: list[RegionOfInterest],
-    pos_xpaths_list: list[str]
+    pos_xpaths_list: list[str],
+    text_nodes_metadata: Optional[dict[str, TextNodeMetadata]] = None,
         ) -> list[RegionOfInterest]:
     # Create a mapping of xpath to its index in pos_xpaths_list
     xpath_order = {
         xpath: index for index, xpath in enumerate(pos_xpaths_list)
     }
+    text_nodes_metadata = text_nodes_metadata or {}
+
+    def document_position(region: RegionOfInterest) -> tuple:
+        first_xpath = region.pos_xpath_list[0]
+        text_node = text_nodes_metadata.get(first_xpath)
+        if text_node is None:
+            return (xpath_order.get(first_xpath, float("inf")), 0, 0, 0)
+        # A text node goes right after the last element that starts before
+        # it. Several text nodes can follow that same element (the tails of
+        # nested elements that close one after another): the deeper one
+        # comes first, then the order among the text nodes of one element.
+        parent_xpath, index = split_text_node_xpath(first_xpath)
+        return (
+            xpath_order.get(text_node.preceding_xpath, float("inf")),
+            1,
+            -get_xpath_depth(parent_xpath),
+            index,
+        )
 
     # Sort the region_of_interest_list
     # based on the first pos_xpath_list entry for each region.
-    sorted_regions = sorted(
-        region_of_interest_list,
-        key=lambda region: xpath_order.get(
-            region.pos_xpath_list[0],
-            float("inf")
-        )
-    )
-
-    return sorted_regions
+    return sorted(region_of_interest_list, key=document_position)
 
 
 @attrs.define(on_setattr=attrs.setters.NO_OP)
@@ -308,7 +355,9 @@ class TreeRegionsSystem:
                 region_of_interest_list=\
                 self.regions_of_interest_list,
                 pos_xpaths_list=\
-                self.tree_representation.pos_xpaths_list
+                self.tree_representation.pos_xpaths_list,
+                text_nodes_metadata=\
+                self.tree_representation.text_nodes_metadata
             )
 
         # This happens when there are no nodes to detect as RegionOfInterest

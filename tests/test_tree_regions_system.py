@@ -266,3 +266,67 @@ class TestOrderRegionsOfInterestByPosXpath:
 
         # Known xpath should come first
         assert sorted_regions[0].pos_xpath_list[0] == "/html/body/div[1]"
+
+
+class TestTextNodeUnits:
+    """Text directly inside a split node takes part in the regions."""
+
+    def test_large_text_node_becomes_its_own_region(self):
+        """A text node over the limit cannot be split: it is not dropped."""
+        html = (
+            "<html><body><div><b>s</b>" + "x" * 300
+            + "<b>t</b><b>u</b></div></body></html>"
+        )
+        tree = DOMTreeRepresentation(website_code=html)
+        div_xpath = "/html/body/div"
+        roi_maker = ROIMaker(
+            node_xpath=div_xpath,
+            children_tags=tree.get_children_tag_list(xpath=div_xpath),
+            tree_representation=tree,
+            max_node_repr_length=100,
+            repr_length_compared_by=ReprLengthComparisionBy.HTML_LENGTH
+        )
+        text_xpath = "/html/body/div/text()[1]"
+        assert text_xpath in roi_maker.content_units
+        assert text_xpath not in roi_maker.children_to_enqueue
+        assert any(
+            roi.pos_xpath_list[0] == text_xpath
+            for roi in roi_maker.regions_of_interest_list
+        )
+
+    def test_order_regions_with_text_nodes(self):
+        """Regions starting with a text node are sorted in document order.
+
+        S1 (the tail of <span>, inside <section>) and D1 (the tail of
+        <section>, inside <div>) both come right after <span>: the deeper one
+        goes first.
+        """
+        html = (
+            "<html><body><div>D0<section>S0<span>LEAF</span>S1</section>D1"
+            "</div></body></html>"
+        )
+        tree = DOMTreeRepresentation(website_code=html)
+        units = (
+            tree.get_content_units("/html/body/div")
+            + tree.get_content_units("/html/body/div/section")
+        )
+        units.remove("/html/body/div/section")  # represented by its units
+        regions = []
+        for unit in reversed(units):  # deliberately out of order
+            roi = RegionOfInterest()
+            roi.pos_xpath_list = [unit]
+            regions.append(roi)
+
+        ordered = order_regions_of_interest_by_pos_xpath(
+            region_of_interest_list=regions,
+            pos_xpaths_list=tree.pos_xpaths_list,
+            text_nodes_metadata=tree.text_nodes_metadata,
+        )
+
+        assert [roi.pos_xpath_list[0] for roi in ordered] == [
+            "/html/body/div/text()[1]",           # D0
+            "/html/body/div/section/text()[1]",   # S0
+            "/html/body/div/section/span",
+            "/html/body/div/section/text()[2]",   # S1
+            "/html/body/div/text()[2]",           # D1
+        ]

@@ -12,6 +12,7 @@ import lxml.etree
 import treelib
 
 import functools
+import html
 
 from typing import Any, Optional
 
@@ -76,6 +77,56 @@ def get_element_text(element, fix_mojibake: bool = True) -> str:
     )
 
 
+# XPath step of the k-th text node child of an element, as in
+# "/html/body/p/text()[2]". Text nodes are not elements, so they have no entry
+# in ``xpaths_metadata``; they are kept in ``text_nodes_metadata`` instead.
+TEXT_NODE_STEP = "/text()["
+
+
+def is_text_node_xpath(xpath: str) -> bool:
+    return TEXT_NODE_STEP in xpath
+
+
+def split_text_node_xpath(xpath: str) -> tuple[str, int]:
+    """Split "/html/body/p/text()[2]" into ("/html/body/p", 2)."""
+    parent_xpath, _, index = xpath.rpartition(TEXT_NODE_STEP)
+    return parent_xpath, int(index[:-1])
+
+
+def render_text_node_html(text_node: str) -> str:
+    """Serialise a text node as HTML, byte-identical to lxml's own output.
+
+    lxml only escapes ``&``, ``<`` and ``>`` in text content. Assigning the
+    text to a temporary element and serialising it would not work: lxml
+    refuses control characters on assignment, although its parser keeps them.
+    """
+    return html.escape(text_node, quote=False)
+
+
+def get_text_node_text(text_node, fix_mojibake: bool = True) -> str:
+    """Normalised text of one lxml text node, following parsel_text's rules.
+
+    The lxml node itself is the Selector root on purpose: it is a "smart
+    string" that knows its parent, so parsel_text can apply the <pre> and
+    <script> rules. Through ``Selector.xpath("text()")`` parsel would return
+    a plain str instead, and that context would be lost.
+    """
+    return parsel_text.get_selector_text(
+        Selector(root=text_node), fix_mojibake=fix_mojibake
+    )
+
+
+def get_last_element(element):
+    """Last element of ``element``'s subtree in document order."""
+    while True:
+        for child in reversed(element):
+            if isinstance(child.tag, str):
+                element = child
+                break
+        else:
+            return element
+
+
 def reject_lone_surrogates(instance, attribute, value: str) -> None:
     """attrs validator: refuse text that lxml would silently truncate.
 
@@ -130,6 +181,46 @@ class NodeMetadata:
 
 
 @attrs.define(on_setattr=attrs.setters.NO_OP)
+class TextNodeMetadata:
+    """A non-blank text node directly inside an element.
+
+    It is the element's own ``.text`` or the ``.tail`` of one of its children.
+    When an element is split into regions, each such node is a content unit
+    of its own (next to the element children), addressed by its standard
+    XPath ``<element xpath>/text()[k]``, so no text is left out of the chunks.
+    """
+    # The lxml "smart string": it knows its parent element.
+    text_node: Any = attrs.field(
+        validator=type_validator()
+    )
+    # Last element that starts before this text node in document order. It
+    # places regions that begin with a text node when they are sorted.
+    preceding_xpath: str = attrs.field(
+        validator=type_validator()
+    )
+    fix_mojibake: bool = attrs.field(
+        validator=type_validator(),
+        default=True
+    )
+
+    @functools.cached_property
+    def html(self) -> str:
+        return render_text_node_html(self.text_node)
+
+    @functools.cached_property
+    def text(self) -> str:
+        return get_text_node_text(self.text_node, fix_mojibake=self.fix_mojibake)
+
+    @property
+    def html_length(self) -> int:
+        return len(self.html)
+
+    @property
+    def text_length(self) -> int:
+        return len(self.text)
+
+
+@attrs.define(on_setattr=attrs.setters.NO_OP)
 class DOMTreeRepresentation:
     website_code: str = attrs.field(
         validator=[type_validator(), reject_lone_surrogates]
@@ -153,6 +244,12 @@ class DOMTreeRepresentation:
     )
 
     xpaths_metadata: dict[str, NodeMetadata] = attrs.field(
+        validator=type_validator(),
+        init=False
+    )
+    # Filled lazily by get_content_units(), only for the elements the
+    # chunker splits.
+    text_nodes_metadata: dict[str, TextNodeMetadata] = attrs.field(
         validator=type_validator(),
         init=False
     )
@@ -184,7 +281,9 @@ class DOMTreeRepresentation:
 
         Done before building the treelib tree so the structure is computed
         only once (instead of building it for every node and then rebuilding
-        after node-by-node deletion).
+        after node-by-node deletion). ``drop_tree()`` keeps each removed
+        element's tail (the text after it, which belongs to the parent);
+        ``parent.remove()`` would drop that text together with the element.
         """
         if not self.tag_list_to_filter_out:
             return
@@ -199,9 +298,8 @@ class DOMTreeRepresentation:
         ]
 
         for element in to_remove:
-            parent = element.getparent()
-            if parent is not None:
-                parent.remove(element)
+            if element.getparent() is not None:
+                element.drop_tree()
 
         logger.info(f"Filtered {len(to_remove)} unwanted elements")
 
@@ -223,6 +321,7 @@ class DOMTreeRepresentation:
         logger.info(f"Found {len(elements)} HTML elements to process")
 
         self.xpaths_metadata: dict[str, Any] = {}
+        self.text_nodes_metadata: dict[str, TextNodeMetadata] = {}
 
         for element in elements:
             pos_xpath: str = roottree.getpath(element)
@@ -283,6 +382,53 @@ class DOMTreeRepresentation:
         )
         return children_tags
 
+    def get_content_units(self, xpath: str) -> list[str]:
+        """Contents of an element as chunkable units, in document order.
+
+        Element children are listed by their positional xpath, and non-blank
+        text nodes (the element's ``.text`` and each child's ``.tail``) by
+        their text-node XPath ``<xpath>/text()[k]``, registering them in
+        ``text_nodes_metadata``. Whitespace-only text nodes carry no content
+        and are skipped.
+        """
+        element = self.xpaths_metadata[xpath].lxml_elem
+        roottree = element.getroottree()
+        # One entry per non-empty .text/.tail, in document order.
+        text_nodes = iter(element.xpath("text()"))
+        units: list[str] = []
+        position = 0
+
+        def add_text_node(after) -> None:
+            nonlocal position
+            text_node = next(text_nodes)
+            position += 1
+            if not text_node.strip():
+                return
+            text_xpath = f"{xpath}{TEXT_NODE_STEP}{position}]"
+            if text_xpath not in self.text_nodes_metadata:
+                preceding = (
+                    xpath if after is None
+                    else roottree.getpath(get_last_element(after))
+                )
+                self.text_nodes_metadata[text_xpath] = TextNodeMetadata(
+                    text_node=text_node,
+                    preceding_xpath=preceding,
+                    fix_mojibake=self.fix_mojibake,
+                )
+            units.append(text_xpath)
+
+        if element.text:
+            add_text_node(after=None)
+        # Last element child seen so far: the tail of a comment follows it.
+        last_child = None
+        for child in element:
+            if isinstance(child.tag, str):
+                units.append(roottree.getpath(child))
+                last_child = child
+            if child.tail:
+                add_text_node(after=last_child)
+        return units
+
     def delete_node(self, pos_xpath: str) -> None:
         """Delete a node from the tree and all associated metadata."""
         logger.debug(f"Deleting node: {pos_xpath}")
@@ -290,11 +436,13 @@ class DOMTreeRepresentation:
         # Delete on treelib.Tree:
         self.tree.remove_node(pos_xpath)
 
-        # Delete on the lxml tree (removes the element and its subtree):
+        # Delete on the lxml tree (removes the element and its subtree, but
+        # keeps its tail, which belongs to the parent):
         element = self.xpaths_metadata[pos_xpath].lxml_elem
-        parent = element.getparent()
-        if parent is not None:
-            parent.remove(element)
+        if element.getparent() is not None:
+            element.drop_tree()
+        # Text node positions inside the parent may have shifted.
+        self.text_nodes_metadata = {}
 
         keys_to_remove: list[str] = [
             xpath for xpath in self.pos_xpaths_list

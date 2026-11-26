@@ -5,6 +5,7 @@ from betterhtmlchunking.tree_representation import get_xpath_depth
 from betterhtmlchunking.tree_representation import (
     render_element_html,
     get_element_text,
+    is_text_node_xpath,
 )
 
 import lxml.html
@@ -338,3 +339,73 @@ class TestLoneSurrogates:
             website_code="<html><body><p>hi \U0001F600 there</p></body></html>"
         )
         assert "\U0001F600" in render_element_html(tree.root)
+
+
+class TestContentUnits:
+    """Text directly inside an element is exposed as text-node units."""
+
+    HTML = (
+        "<html><body><p>Intro <b>bold</b> middle <!-- note --> after comment"
+        "<i>it</i>   </p></body></html>"
+    )
+
+    def test_units_interleave_elements_and_text(self):
+        tree = DOMTreeRepresentation(website_code=self.HTML)
+        assert tree.get_content_units("/html/body/p") == [
+            "/html/body/p/text()[1]",   # "Intro "
+            "/html/body/p/b",
+            "/html/body/p/text()[2]",   # " middle " (tail of <b>)
+            "/html/body/p/text()[3]",   # " after comment" (tail of the comment)
+            "/html/body/p/i",           # its blank tail is not a unit
+        ]
+
+    def test_text_unit_ids_are_valid_xpath(self):
+        tree = DOMTreeRepresentation(website_code=self.HTML)
+        roottree = tree.root.getroottree()
+        for unit in tree.get_content_units("/html/body/p"):
+            if is_text_node_xpath(unit):
+                (node,) = roottree.xpath(unit)
+                assert node == tree.text_nodes_metadata[unit].text_node
+
+    def test_text_unit_html_and_text(self):
+        html = "<html><body><pre>  File <b>x</b>, a &lt; b  </pre></body></html>"
+        tree = DOMTreeRepresentation(website_code=html)
+        first, last = tree.get_content_units("/html/body/pre")[::2]
+        first = tree.text_nodes_metadata[first]
+        last = tree.text_nodes_metadata[last]
+        assert first.text == "  File "          # whitespace kept inside <pre>
+        assert last.html == ", a &lt; b  "     # escaped exactly like lxml does
+        assert last.html_length == len(last.html)
+
+    def test_control_characters_do_not_break_rendering(self):
+        """lxml keeps control characters when parsing; rendering must too."""
+        tree = DOMTreeRepresentation(
+            website_code="<html><body><p>a\x0cb <b>x</b> c</p></body></html>"
+        )
+        unit = tree.get_content_units("/html/body/p")[0]
+        assert tree.text_nodes_metadata[unit].html == "a\x0cb "
+
+
+class TestRemovalKeepsTails:
+    """Removing an element keeps the text that follows it (its tail)."""
+
+    def test_filter_keeps_tails(self):
+        html = (
+            "<html><body><p>Hello <script>x()</script> world, "
+            "<svg><g/></svg> icon text.</p></body></html>"
+        )
+        tree = DOMTreeRepresentation(
+            website_code=html, tag_list_to_filter_out=["/script", "/svg"]
+        )
+        text = get_element_text(tree.root)
+        assert "world," in text
+        assert "icon text." in text
+        assert "x()" not in text
+
+    def test_delete_node_keeps_tail(self):
+        html = "<html><body><p>a <b>bold</b> tail</p></body></html>"
+        tree = DOMTreeRepresentation(website_code=html)
+        tree.delete_node("/html/body/p/b")
+        text = get_element_text(tree.root)
+        assert "tail" in text
+        assert "bold" not in text
