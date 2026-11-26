@@ -4,7 +4,7 @@ import attrs
 import html
 import logging
 import re
-from typing import Optional
+from typing import Optional, Union
 
 from attrs_strict import type_validator
 from betterhtmlchunking.tree_representation import (
@@ -179,3 +179,68 @@ class DomRepresentation:
         logger.info(
             f"Processing complete: Generated {len(self.render_system.html_render_roi)} chunks"
         )
+
+
+@attrs.frozen
+class Chunk:
+    """One chunk of a document, as returned by chunk_html()."""
+    # Position of the chunk in the document, starting at 0.
+    index: int = attrs.field(validator=type_validator())
+    html: str = attrs.field(validator=type_validator())
+    text: str = attrs.field(validator=type_validator())
+    # Positional xpaths of the chunk's pieces: elements, and text nodes as
+    # "<element xpath>/text()[k]".
+    xpaths: tuple[str, ...] = attrs.field(validator=type_validator())
+
+
+_COMPARED_BY = {
+    "html": ReprLengthComparisonBy.HTML_LENGTH,
+    "text": ReprLengthComparisonBy.TEXT_LENGTH,
+}
+
+
+def chunk_html(
+    website_code: str,
+    max_length: int,
+    by: Union[str, ReprLengthComparisonBy] = "html",
+    *,
+    tag_list_to_filter_out: Optional[list[str]] = None,
+    html_unescape: Optional[bool] = None,
+    fix_mojibake: bool = True,
+) -> list[Chunk]:
+    """Split an HTML document into chunks, in document order.
+
+    ``max_length`` is the size limit of each chunk, measured on its HTML
+    (``by="html"``, the default) or on its text (``by="text"``); ``by``
+    also accepts a ReprLengthComparisonBy member. The keyword-only options
+    are those of DomRepresentation. Use DomRepresentation directly for
+    access to the DOM tree and the regions of interest.
+    """
+    if isinstance(by, ReprLengthComparisonBy):
+        compared_by = by
+    elif isinstance(by, str) and by in _COMPARED_BY:
+        compared_by = _COMPARED_BY[by]
+    else:
+        raise ValueError(f"by must be 'html' or 'text', not {by!r}")
+
+    dom = DomRepresentation(
+        MAX_NODE_REPR_LENGTH=max_length,
+        website_code=website_code,
+        repr_length_compared_by=compared_by,
+        tag_list_to_filter_out=tag_list_to_filter_out,
+        html_unescape=html_unescape,
+        fix_mojibake=fix_mojibake,
+    )
+    dom.start()
+
+    render = dom.render_system
+    regions = dom.tree_regions_system.sorted_roi_by_pos_xpath
+    return [
+        Chunk(
+            index=idx,
+            html=render.html_render_roi[idx],
+            text=render.text_render_roi[idx],
+            xpaths=tuple(regions[idx].pos_xpath_list),
+        )
+        for idx in sorted(render.html_render_roi)
+    ]
