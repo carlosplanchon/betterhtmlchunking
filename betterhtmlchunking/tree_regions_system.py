@@ -53,7 +53,7 @@ class RegionOfInterest:
         self.node_is_roi: bool = False
 
 
-class ReprLengthComparisionBy(StrEnum):
+class ReprLengthComparisonBy(StrEnum):
     TEXT_LENGTH: str = "text_length"
     HTML_LENGTH: str = "html_length"
 
@@ -72,7 +72,7 @@ class ROIMaker:
     max_node_repr_length: int = attrs.field(
         validator=type_validator()
     )
-    repr_length_compared_by: ReprLengthComparisionBy = attrs.field(
+    repr_length_compared_by: ReprLengthComparisonBy = attrs.field(
         validator=type_validator(),
     )
 
@@ -107,9 +107,9 @@ class ROIMaker:
     def get_node_repr_length(self, node: treelib.Node) -> int:
         """Get the representation length of a node based on comparison mode."""
         match self.repr_length_compared_by:
-            case ReprLengthComparisionBy.TEXT_LENGTH:
+            case ReprLengthComparisonBy.TEXT_LENGTH:
                 return node.data.text_length
-            case ReprLengthComparisionBy.HTML_LENGTH:
+            case ReprLengthComparisonBy.HTML_LENGTH:
                 return node.data.html_length
 
     def get_unit_repr_length(self, unit_xpath: str) -> int:
@@ -119,9 +119,9 @@ class ROIMaker:
         else:
             data = self.tree_representation.tree.get_node(nid=unit_xpath).data
         match self.repr_length_compared_by:
-            case ReprLengthComparisionBy.TEXT_LENGTH:
+            case ReprLengthComparisonBy.TEXT_LENGTH:
                 return data.text_length
-            case ReprLengthComparisionBy.HTML_LENGTH:
+            case ReprLengthComparisonBy.HTML_LENGTH:
                 return data.html_length
 
     def _process_children(self) -> None:
@@ -270,9 +270,9 @@ class TreeRegionsSystem:
         validator=type_validator(),
         init=False
     )
-    repr_length_compared_by: ReprLengthComparisionBy = attrs.field(
+    repr_length_compared_by: ReprLengthComparisonBy = attrs.field(
         validator=type_validator(),
-        default=ReprLengthComparisionBy.HTML_LENGTH
+        default=ReprLengthComparisonBy.HTML_LENGTH
     )
 
     def __attrs_post_init__(self):
@@ -291,9 +291,9 @@ class TreeRegionsSystem:
 
     def get_node_repr_length(self, node: treelib.Node) -> int:
         match self.repr_length_compared_by:
-            case ReprLengthComparisionBy.TEXT_LENGTH:
+            case ReprLengthComparisonBy.TEXT_LENGTH:
                 node_repr_length: int = node.data.text_length
-            case ReprLengthComparisionBy.HTML_LENGTH:
+            case ReprLengthComparisonBy.HTML_LENGTH:
                 node_repr_length: int = node.data.html_length
 
         return node_repr_length

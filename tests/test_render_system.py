@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
 from betterhtmlchunking.main import DomRepresentation
-from betterhtmlchunking.tree_regions_system import ReprLengthComparisionBy
+from betterhtmlchunking.tree_regions_system import ReprLengthComparisonBy
 
 
-def _dom(html, max_length, mode=ReprLengthComparisionBy.HTML_LENGTH):
+def _dom(html, max_length, mode=ReprLengthComparisonBy.HTML_LENGTH):
     dom = DomRepresentation(
         MAX_NODE_REPR_LENGTH=max_length,
         website_code=html,
@@ -77,7 +77,7 @@ class TestRenderSystemOutput:
         dom = _dom(
             LARGE_HTML,
             max_length=200,
-            mode=ReprLengthComparisionBy.TEXT_LENGTH,
+            mode=ReprLengthComparisonBy.TEXT_LENGTH,
         )
         assert len(dom.render_system.text_render_roi) >= 1
         joined = "\n".join(dom.render_system.text_render_roi.values())
